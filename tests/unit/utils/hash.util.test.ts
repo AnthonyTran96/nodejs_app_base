@@ -1,4 +1,4 @@
-import { HashUtil } from '../../../src/utils/hash';
+import { HashUtil } from '@/shared/utils/hash';
 
 describe('HashUtil', () => {
   describe('hash', () => {

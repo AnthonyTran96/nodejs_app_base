@@ -28,15 +28,17 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/controllers/*": ["src/controllers/*"],
-      "@/services/*": ["src/services/*"],
-      "@/repositories/*": ["src/repositories/*"],
+      "@/modules/*": ["src/modules/*"],
+      "@/shared/*": ["src/shared/*"],
+      "@/auth/*": ["src/modules/auth/*"],
+      "@/user/*": ["src/modules/user/*"],
       "@/models/*": ["src/models/*"],
-      "@/dtos/*": ["src/dtos/*"],
-      "@/middleware/*": ["src/middleware/*"],
-      "@/utils/*": ["src/utils/*"],
-      "@/config/*": ["src/config/*"],
-      "@/database/*": ["src/database/*"]
+      "@/shared/utils/*": ["src/shared/utils/*"],
+      "@/shared/middleware/*": ["src/shared/middleware/*"],
+      "@/shared/config/*": ["src/shared/config/*"],
+      "@/shared/database/*": ["src/shared/database/*"],
+      "@/shared/core/*": ["src/shared/core/*"],
+      "@/shared/types/*": ["src/shared/types/*"]
     }
   },
   "include": ["src/**/*"],

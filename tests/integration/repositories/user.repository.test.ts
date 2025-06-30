@@ -1,5 +1,5 @@
-import { UserRepository } from '../../../src/repositories/user.repository';
-import { DatabaseConnection } from '../../../src/database/connection';
+import { UserRepository } from '@/user/user.repository';
+import { DatabaseConnection } from '@/shared/database/connection';
 
 describe('UserRepository Integration Tests', () => {
   let userRepository: UserRepository;

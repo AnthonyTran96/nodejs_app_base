@@ -17,8 +17,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "check": "npm run lint && npm run build",
-    "db:migrate": "ts-node src/database/migrations/index.ts",
-    "db:seed": "ts-node src/database/seeds/index.ts"
+    "db:migrate": "ts-node src/shared/database/migrations/index.ts",
+    "db:seed": "ts-node src/shared/database/seeds/index.ts"
   },
   "keywords": ["nodejs", "typescript", "express", "backend", "api"],
   "author": "",

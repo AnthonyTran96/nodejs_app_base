@@ -5,14 +5,14 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { Server } from 'http';
 
-import { Container } from './core/container';
-import { DatabaseConnection } from './database/connection';
-import { router, initializeRoutes } from './routes';
-import { errorHandler } from './middleware/error-handler';
-import { requestLogger } from './middleware/request-logger';
-import { notFoundHandler } from './middleware/not-found-handler';
-import { config } from './config/environment';
-import { logger } from './utils/logger';
+import { Container } from '@/shared/core/container';
+import { DatabaseConnection } from '@/shared/database/connection';
+import { router, initializeRoutes } from '@/shared/core';
+import { errorHandler } from '@/shared/middleware/error-handler';
+import { requestLogger } from '@/shared/middleware/request-logger';
+import { notFoundHandler } from '@/shared/middleware/not-found-handler';
+import { config } from '@/shared/config/environment';
+import { logger } from '@/shared/utils/logger';
 
 export class Application {
   private readonly app: Express;
@@ -45,10 +45,12 @@ export class Application {
   private setupMiddleware(): void {
     // Security middleware
     this.app.use(helmet());
-    this.app.use(cors({
-      origin: config.nodeEnv === 'production' ? [] : true, // Configure for production
-      credentials: true,
-    }));
+    this.app.use(
+      cors({
+        origin: config.nodeEnv === 'production' ? [] : true, // Configure for production
+        credentials: true,
+      })
+    );
 
     // Request processing
     this.app.use(compression());
@@ -63,10 +65,10 @@ export class Application {
   private setupRoutes(): void {
     // Health check
     this.app.get('/health', (_req, res) => {
-      res.json({ 
-        status: 'OK', 
+      res.json({
+        status: 'OK',
         timestamp: new Date().toISOString(),
-        environment: config.nodeEnv 
+        environment: config.nodeEnv,
       });
     });
 
@@ -81,35 +83,35 @@ export class Application {
 
   private async setupDependencies(): Promise<void> {
     // Import and register services
-    const { UserRepository } = await import('./repositories/user.repository');
-    const { UserService } = await import('./services/user.service');
-    const { AuthService } = await import('./services/auth.service');
-    const { AuthController } = await import('./controllers/auth.controller');
-    const { UserController } = await import('./controllers/user.controller');
-    const { UnitOfWork } = await import('./core/unit-of-work');
+    const { UserRepository } = await import('@/user/user.repository');
+    const { UserService } = await import('@/user/user.service');
+    const { AuthService } = await import('@/auth/auth.service');
+    const { AuthController } = await import('@/auth/auth.controller');
+    const { UserController } = await import('@/user/user.controller');
+    const { UnitOfWork } = await import('@/shared/core/unit-of-work');
 
     // Register services manually
     this.container.register('UserRepository', UserRepository);
     this.container.register('UnitOfWork', UnitOfWork);
-    this.container.register('UserService', UserService, { 
-      dependencies: ['UserRepository', 'UnitOfWork'] 
+    this.container.register('UserService', UserService, {
+      dependencies: ['UserRepository', 'UnitOfWork'],
     });
-    this.container.register('AuthService', AuthService, { 
-      dependencies: ['UserService'] 
+    this.container.register('AuthService', AuthService, {
+      dependencies: ['UserService'],
     });
-    this.container.register('AuthController', AuthController, { 
-      dependencies: ['AuthService', 'UserService'] 
+    this.container.register('AuthController', AuthController, {
+      dependencies: ['AuthService', 'UserService'],
     });
-    this.container.register('UserController', UserController, { 
-      dependencies: ['UserService'] 
+    this.container.register('UserController', UserController, {
+      dependencies: ['UserService'],
     });
 
     // Initialize container
     await this.container.initialize();
-    
+
     // Initialize routes after dependencies are registered
     initializeRoutes();
-    
+
     logger.info('✅ Dependency injection container initialized');
   }
 
@@ -120,4 +122,4 @@ export class Application {
   getApp(): Express {
     return this.app;
   }
-} 
+}
