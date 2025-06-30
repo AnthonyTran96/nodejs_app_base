@@ -53,6 +53,7 @@ export function initializeRoutes(): void {
     router.use('/auth', createAuthRoutes(authController));
     router.use('/users', createUserRoutes(userController));
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error('Failed to initialize routes:', error);
     // Graceful degradation - routes will be registered when services are available
   }

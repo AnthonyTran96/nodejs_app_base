@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { DatabaseConnection } from '../connection';
 import { HashUtil } from '../../utils/hash';
 

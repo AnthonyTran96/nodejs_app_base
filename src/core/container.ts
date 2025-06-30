@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { Constructor } from '../types/common';
 
 export interface ServiceMetadata {
   token: string | symbol;
@@ -31,9 +30,9 @@ export class Container {
     }
   }
 
-  register<T>(
+  register(
     token: string | symbol,
-    implementation: Constructor<T> | (() => T),
+    implementation: any,
     options: { singleton?: boolean; dependencies?: (string | symbol)[] } = {}
   ): void {
     const metadata: ServiceMetadata = {
@@ -43,11 +42,17 @@ export class Container {
     };
 
     if (typeof implementation === 'function' && implementation.prototype) {
-      // Constructor function
-      metadata.factory = () => new (implementation as Constructor<T>)();
+      // Constructor function with dependency injection
+      metadata.factory = () => {
+        if (options.dependencies && options.dependencies.length > 0) {
+          const deps = options.dependencies.map(dep => this.services.get(dep));
+          return new implementation(...deps);
+        }
+        return new implementation();
+      };
     } else {
       // Factory function
-      metadata.factory = implementation as () => T;
+      metadata.factory = implementation;
     }
 
     this.metadata.set(token, metadata);

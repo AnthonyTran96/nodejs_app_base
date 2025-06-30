@@ -42,6 +42,7 @@ export const errorHandler = (
   error: AppError,
   req: Request,
   res: Response,
+  // eslint-disable-next-line no-unused-vars
   _next: NextFunction
 ): void => {
   // Log error details
