@@ -32,17 +32,15 @@ Controllers → Services → Unit of Work → Repositories → Database
 ```
 src/
 ├── config/              # Environment configuration
-├── controllers/         # HTTP request handlers
 ├── core/               # Dependency injection & Unit of Work
 ├── database/           # Database connection & migrations
-├── dtos/               # Data Transfer Objects with validation
 ├── middleware/         # Express middleware
-├── models/             # Data models and interfaces
-├── repositories/       # Data access layer
-├── routes/             # Route definitions
-├── services/           # Business logic layer
 ├── types/              # TypeScript type definitions
-└── utils/              # Utility functions
+├── utils/              # Utility functions
+├── modules/            # Feature modules
+│   ├── auth/           # Authentication module
+│   └── user/           # User management module
+└── models/             # Data models and interfaces
 
 tests/
 ├── unit/               # Unit tests
@@ -86,10 +84,11 @@ GET /health
 
 ### Authentication
 ```bash
+POST /api/v1/auth/register    # Register new user
 POST /api/v1/auth/login       # Login
 POST /api/v1/auth/refresh     # Refresh token
 POST /api/v1/auth/logout      # Logout
-GET  /api/v1/auth/me          # Get current user
+GET  /api/v1/auth/profile     # Get current user profile
 ```
 
 ### Users (Authentication Required)
@@ -106,17 +105,22 @@ GET    /api/v1/users/stats    # User statistics (admin only)
 ## 🧪 Testing
 
 ```bash
-# Run all tests
+# Run unit and integration tests
 npm test
+
+# Run all tests (unit + integration + E2E)
+npm run test:all
+
+# Run specific test types
+npm run test:unit
+npm run test:integration
+npm run test:e2e
 
 # Run with coverage
 npm run test:coverage
 
 # Run in watch mode
 npm run test:watch
-
-# Run E2E tests
-npm run test:e2e
 ```
 
 ## 🔧 Development
@@ -134,6 +138,15 @@ npm run format
 
 # Check everything
 npm run check
+```
+
+### Build & TypeScript
+```bash
+# Build for production
+npm run build
+
+# Type check without emitting
+npx tsc --noEmit
 ```
 
 ### Database
@@ -185,6 +198,16 @@ export class CreateUserDto {
 }
 ```
 
+### Path Aliases
+Clean imports with TypeScript path mapping:
+
+```typescript
+import { UserService } from '@/user/user.service';
+import { DatabaseConnection } from '@/database/connection';
+import { config } from '@/config/environment';
+import { logger } from '@/utils/logger';
+```
+
 ### Response Format
 Standardized API responses:
 
@@ -215,9 +238,9 @@ Standardized API responses:
 ✅ **Server**: Runs on port 3000  
 ✅ **Database**: SQLite initialized  
 ✅ **API**: Health endpoint working  
-✅ **Docs**: API documentation available at `/api/v1/docs`  
-✅ **Architecture**: Layered structure implemented  
-✅ **Testing**: Framework configured  
+✅ **Tests**: 79/79 tests passing  
+✅ **Architecture**: Clean layered structure  
+✅ **Path Aliases**: Configured for clean imports  
 ✅ **Documentation**: Comprehensive guides available  
 
 ## 🤝 Contributing
