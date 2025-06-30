@@ -1,10 +1,10 @@
-import { UserRepository } from './user.repository';
-import { UnitOfWork } from '@/shared/core/unit-of-work';
-import { HashUtil } from '@/shared/utils/hash';
+import { UserRepository } from '@/user/user.repository';
+import { UnitOfWork } from '@/core/unit-of-work';
+import { HashUtil } from '@/utils/hash';
 import { User, CreateUserRequest, UpdateUserRequest, UserResponse } from '@/models/user.model';
-import { PaginationOptions, PaginatedResult } from '@/shared/types/common';
-import { ValidationError, NotFoundError } from '@/shared/middleware/error-handler';
-import { Service } from '@/shared/core/container';
+import { PaginationOptions, PaginatedResult } from '@/types/common';
+import { ValidationError, NotFoundError } from '@/middleware/error-handler';
+import { Service } from '@/core/container';
 
 @Service('UserService')
 export class UserService {

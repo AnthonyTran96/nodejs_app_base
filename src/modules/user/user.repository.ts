@@ -1,6 +1,6 @@
-import { BaseRepository } from '@/shared/core/base.repository';
+import { BaseRepository } from '@/core/base.repository';
 import { User } from '@/models/user.model';
-import { Service } from '@/shared/core/container';
+import { Service } from '@/core/container';
 
 @Service('UserRepository')
 export class UserRepository extends BaseRepository<User> {

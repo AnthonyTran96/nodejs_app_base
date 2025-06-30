@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { config } from '../config/environment';
-import { JwtPayload, AuthenticatedRequest } from '../types/common';
-import { UnauthorizedError, ForbiddenError } from './error-handler';
+import { config } from '@/config/environment';
+import { JwtPayload, AuthenticatedRequest } from '@/types/common';
+import { UnauthorizedError, ForbiddenError } from '@/middleware/error-handler';
 
 export class AuthMiddleware {
   static authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {

@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { UserService } from './user.service';
-import { ResponseUtil } from '../../shared/utils/response';
-import { AuthenticatedRequest } from '../../shared/types/common';
-import { Service } from '../../shared/core/container';
+import { UserService } from '@/user/user.service';
+import { ResponseUtil } from '@/utils/response';
+import { AuthenticatedRequest } from '@/types/common';
+import { Service } from '@/core/container';
 
 @Service('UserController')
 export class UserController {

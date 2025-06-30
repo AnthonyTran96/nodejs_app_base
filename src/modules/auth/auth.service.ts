@@ -1,11 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { Response } from 'express';
 import { UserService } from '@/user/user.service';
-import { HashUtil } from '@/shared/utils/hash';
-import { config } from '@/shared/config/environment';
-import { JwtPayload } from '@/shared/types/common';
-import { UnauthorizedError } from '@/shared/middleware/error-handler';
-import { Service } from '@/shared/core/container';
+import { HashUtil } from '@/utils/hash';
+import { config } from '@/config/environment';
+import { JwtPayload } from '@/types/common';
+import { UnauthorizedError } from '@/middleware/error-handler';
+import { Service } from '@/core/container';
 
 export interface AuthTokens {
   accessToken: string;

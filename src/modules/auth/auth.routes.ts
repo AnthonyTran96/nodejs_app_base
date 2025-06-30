@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { AuthController } from './auth.controller';
-import { ValidateBody } from '@/shared/middleware/validation.middleware';
-import { AuthGuard } from '@/shared/middleware/auth.middleware';
+import { AuthController } from '@/auth/auth.controller';
+import { ValidateBody } from '@/middleware/validation.middleware';
+import { AuthGuard } from '@/middleware/auth.middleware';
 import { LoginDto, CreateUserDto } from '@/user/user.dto';
 
 export function createAuthRoutes(authController: AuthController): Router {

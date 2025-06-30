@@ -1,7 +1,7 @@
 import 'reflect-metadata';
-import { Application } from './app';
-import { logger } from '@/shared/utils/logger';
-import { config } from '@/shared/config/environment';
+import { Application } from '@/app';
+import { logger } from '@/utils/logger';
+import { config } from '@/config/environment';
 
 async function bootstrap(): Promise<void> {
   try {

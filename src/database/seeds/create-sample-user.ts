@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
-import { DatabaseConnection } from '../connection';
-import { HashUtil } from '../../utils/hash';
+import { DatabaseConnection } from '@/database/connection';
+import { HashUtil } from '@/utils/hash';
 
 async function createSampleUser(): Promise<void> {
   const dbConnection = DatabaseConnection.getInstance();

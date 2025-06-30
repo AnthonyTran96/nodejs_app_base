@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from './auth.service';
+import { AuthService } from '@/auth/auth.service';
 import { UserService } from '@/user/user.service';
-import { ResponseUtil } from '@/shared/utils/response';
-import { AuthenticatedRequest } from '@/shared/types/common';
-import { Service } from '@/shared/core/container';
+import { ResponseUtil } from '@/utils/response';
+import { AuthenticatedRequest } from '@/types/common';
+import { Service } from '@/core/container';
 
 @Service('AuthController')
 export class AuthController {

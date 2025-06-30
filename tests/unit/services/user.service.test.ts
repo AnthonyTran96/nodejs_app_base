@@ -1,14 +1,14 @@
 import { UserService } from '@/user/user.service';
 import { UserRepository } from '@/user/user.repository';
-import { UnitOfWork } from '@/shared/core/unit-of-work';
-import { ValidationError, NotFoundError } from '@/shared/middleware/error-handler';
-import { HashUtil } from '@/shared/utils/hash';
+import { UnitOfWork } from '@/core/unit-of-work';
+import { ValidationError, NotFoundError } from '@/middleware/error-handler';
+import { HashUtil } from '@/utils/hash';
 import { User } from '../../../src/models/user.model';
 
 // Mock dependencies
 jest.mock('@/user/user.repository');
-jest.mock('@/shared/core/unit-of-work');
-jest.mock('@/shared/utils/hash');
+jest.mock('@/core/unit-of-work');
+jest.mock('@/utils/hash');
 
 describe('UserService', () => {
   let userService: UserService;

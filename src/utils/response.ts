@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { ApiResponse, PaginatedResult } from '../types/common';
+import { ApiResponse, PaginatedResult } from '@/types/common';
 
 export class ResponseUtil {
   static success<T>(

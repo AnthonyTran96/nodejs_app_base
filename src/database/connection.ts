@@ -1,6 +1,6 @@
-import { DatabaseConnection as IDBConnection, DatabaseType, QueryResult } from '../types/database';
-import { config } from '../config/environment';
-import { logger } from '../utils/logger';
+import { DatabaseConnection as IDBConnection, DatabaseType, QueryResult } from '@/types/database';
+import { config } from '@/config/environment';
+import { logger } from '@/utils/logger';
 
 export class DatabaseConnection implements IDBConnection {
   private static instance: DatabaseConnection;

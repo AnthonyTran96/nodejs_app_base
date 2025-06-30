@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { UserController } from './user.controller';
+import { UserController } from '@/user/user.controller';
 import {
   ValidateBody,
   ValidateParams,
   ValidateQuery,
-} from '@/shared/middleware/validation.middleware';
-import { AuthGuard, RoleGuard } from '@/shared/middleware/auth.middleware';
-import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from './user.dto';
-import { IdParamDto, PaginationDto } from '@/shared/types/common.dto';
+} from '@/middleware/validation.middleware';
+import { AuthGuard, RoleGuard } from '@/middleware/auth.middleware';
+import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from '@/user/user.dto';
+import { IdParamDto, PaginationDto } from '@/types/common.dto';
 
 export function createUserRoutes(userController: UserController): Router {
   const router = Router();

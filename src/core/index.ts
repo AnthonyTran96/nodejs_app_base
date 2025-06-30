@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { Container } from './container';
+import { Container } from '@/core/container';
 import { AuthController } from '@/auth/auth.controller';
 import { UserController } from '@/user/user.controller';
 import { createAuthRoutes } from '@/auth/auth.routes';
 import { createUserRoutes } from '@/user/user.routes';
-import { logger } from '@/shared/utils/logger';
+import { logger } from '@/utils/logger';
 
 export const router = Router();
 

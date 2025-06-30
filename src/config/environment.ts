@@ -1,5 +1,5 @@
+import { DatabaseType } from '@/types/database';
 import dotenv from 'dotenv';
-import { DatabaseType } from '../types/database';
 
 dotenv.config();
 

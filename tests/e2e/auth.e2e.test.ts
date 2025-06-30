@@ -1,9 +1,9 @@
 import request from 'supertest';
 import { Application } from '../../src/app';
-import { DatabaseConnection } from '@/shared/database/connection';
-import { Container } from '@/shared/core/container';
+import { DatabaseConnection } from '@/database/connection';
+import { Container } from '@/core/container';
 import { UserRepository } from '@/user/user.repository';
-import { HashUtil } from '@/shared/utils/hash';
+import { HashUtil } from '@/utils/hash';
 
 describe('Auth E2E Tests', () => {
   let app: Application;

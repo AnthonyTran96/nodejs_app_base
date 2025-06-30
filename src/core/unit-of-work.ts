@@ -1,5 +1,5 @@
-import { DatabaseConnection } from '../database/connection';
-import { BaseRepository } from './base.repository';
+import { DatabaseConnection } from '@/database/connection';
+import { BaseRepository } from '@/core/base.repository';
 
 export class UnitOfWork {
   private readonly dbConnection: DatabaseConnection;

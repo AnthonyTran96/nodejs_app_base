@@ -1,6 +1,6 @@
-import { DatabaseConnection } from '../database/connection';
-import { QueryResult } from '../types/database';
-import { PaginationOptions, PaginatedResult } from '../types/common';
+import { DatabaseConnection } from '@/database/connection';
+import { QueryResult } from '@/types/database';
+import { PaginationOptions, PaginatedResult } from '@/types/common';
 
 export abstract class BaseRepository<T> {
   protected readonly db: DatabaseConnection;

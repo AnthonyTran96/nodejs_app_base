@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { validate, ValidationError as ClassValidationError } from 'class-validator';
-import { plainToClass } from 'class-transformer';
-import { ValidationError } from './error-handler';
-import { Constructor } from '../types/common';
+import { plainToInstance } from 'class-transformer';
+import { ValidationError } from '@/middleware/error-handler';
+import { Constructor } from '@/types/common';
 
 export function ValidationMiddleware<T>(
   dtoClass: Constructor<T>,
@@ -13,7 +13,7 @@ export function ValidationMiddleware<T>(
       const data = req[source];
 
       // Transform plain object to class instance
-      const dto = plainToClass(dtoClass, data);
+      const dto = plainToInstance(dtoClass, data);
 
       // Validate the DTO
       const errors = await validate(dto as object);

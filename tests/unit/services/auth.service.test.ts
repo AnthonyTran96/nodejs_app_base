@@ -1,14 +1,14 @@
 import { AuthService } from '@/auth/auth.service';
 import { UserService } from '@/user/user.service';
-import { HashUtil } from '@/shared/utils/hash';
-import { UnauthorizedError } from '@/shared/middleware/error-handler';
-import { config } from '@/shared/config/environment';
+import { HashUtil } from '@/utils/hash';
+import { UnauthorizedError } from '@/middleware/error-handler';
+import { config } from '@/config/environment';
 import jwt from 'jsonwebtoken';
 import { Response } from 'express';
 
 // Mock dependencies
 jest.mock('@/user/user.service');
-jest.mock('@/shared/utils/hash');
+jest.mock('@/utils/hash');
 jest.mock('jsonwebtoken');
 
 describe('AuthService', () => {

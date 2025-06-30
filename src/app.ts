@@ -5,14 +5,14 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { Server } from 'http';
 
-import { Container } from '@/shared/core/container';
-import { DatabaseConnection } from '@/shared/database/connection';
-import { router, initializeRoutes } from '@/shared/core';
-import { errorHandler } from '@/shared/middleware/error-handler';
-import { requestLogger } from '@/shared/middleware/request-logger';
-import { notFoundHandler } from '@/shared/middleware/not-found-handler';
-import { config } from '@/shared/config/environment';
-import { logger } from '@/shared/utils/logger';
+import { Container } from '@/core/container';
+import { DatabaseConnection } from '@/database/connection';
+import { router, initializeRoutes } from '@/core';
+import { errorHandler } from '@/middleware/error-handler';
+import { requestLogger } from '@/middleware/request-logger';
+import { notFoundHandler } from '@/middleware/not-found-handler';
+import { config } from '@/config/environment';
+import { logger } from '@/utils/logger';
 
 export class Application {
   private readonly app: Express;
@@ -88,7 +88,7 @@ export class Application {
     const { AuthService } = await import('@/auth/auth.service');
     const { AuthController } = await import('@/auth/auth.controller');
     const { UserController } = await import('@/user/user.controller');
-    const { UnitOfWork } = await import('@/shared/core/unit-of-work');
+    const { UnitOfWork } = await import('@/core/unit-of-work');
 
     // Register services manually
     this.container.register('UserRepository', UserRepository);

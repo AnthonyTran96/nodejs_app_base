@@ -29,16 +29,15 @@
     "paths": {
       "@/*": ["src/*"],
       "@/modules/*": ["src/modules/*"],
-      "@/shared/*": ["src/shared/*"],
       "@/auth/*": ["src/modules/auth/*"],
       "@/user/*": ["src/modules/user/*"],
       "@/models/*": ["src/models/*"],
-      "@/shared/utils/*": ["src/shared/utils/*"],
-      "@/shared/middleware/*": ["src/shared/middleware/*"],
-      "@/shared/config/*": ["src/shared/config/*"],
-      "@/shared/database/*": ["src/shared/database/*"],
-      "@/shared/core/*": ["src/shared/core/*"],
-      "@/shared/types/*": ["src/shared/types/*"]
+      "@/utils/*": ["src/utils/*"],
+      "@/middleware/*": ["src/middleware/*"],
+      "@/config/*": ["src/config/*"],
+      "@/database/*": ["src/database/*"],
+      "@/core/*": ["src/core/*"],
+      "@/types/*": ["src/types/*"]
     }
   },
   "include": ["src/**/*"],
