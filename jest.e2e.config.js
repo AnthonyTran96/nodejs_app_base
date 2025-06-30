@@ -11,4 +11,5 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/tests/e2e/setup.ts'],
   testTimeout: 30000,
+  maxWorkers: 1,
 }; 

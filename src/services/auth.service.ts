@@ -18,6 +18,8 @@ export interface LoginResponse {
     email: string;
     name: string;
     role: string;
+    createdAt: Date;
+    updatedAt: Date;
   };
   tokens: AuthTokens;
 }
@@ -49,6 +51,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       },
       tokens,
     };
@@ -78,6 +82,8 @@ export class AuthService {
   }
 
   private generateTokens(payload: Omit<JwtPayload, 'iat' | 'exp'>): AuthTokens {
+    const now = Date.now();
+    
     const signOptions: any = {
       expiresIn: config.jwt.expiresIn,
     };
@@ -87,13 +93,13 @@ export class AuthService {
     };
 
     const accessToken = jwt.sign(
-      { ...payload }, 
+      { ...payload, timestamp: now }, 
       config.jwt.secret, 
       signOptions
     );
 
     const refreshToken = jwt.sign(
-      { ...payload }, 
+      { ...payload, timestamp: now }, 
       config.jwt.refreshSecret, 
       refreshOptions
     );

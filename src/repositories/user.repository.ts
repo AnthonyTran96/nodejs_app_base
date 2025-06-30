@@ -9,13 +9,14 @@ export class UserRepository extends BaseRepository<User> {
   async findByEmail(email: string): Promise<User | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE email = ? LIMIT 1`;
     const result = await this.executeQuery<User>(sql, [email]);
-    return result.rows[0] || null;
+    const row = result.rows[0];
+    return row ? this.transformDates(row) : null;
   }
 
   async findByRole(role: string): Promise<User[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE role = ?`;
     const result = await this.executeQuery<User>(sql, [role]);
-    return result.rows;
+    return result.rows.map(row => this.transformDates(row));
   }
 
   async emailExists(email: string, excludeId?: number): Promise<boolean> {

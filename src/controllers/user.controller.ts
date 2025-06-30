@@ -19,7 +19,7 @@ export class UserController {
         sortOrder: sortOrder as 'ASC' | 'DESC',
       });
 
-      ResponseUtil.successWithPagination(res, result, 'Users retrieved successfully');
+      ResponseUtil.success(res, { users: result.data, meta: result.meta }, 'Users retrieved successfully');
     } catch (error) {
       next(error);
     }
@@ -35,7 +35,7 @@ export class UserController {
         return;
       }
 
-      ResponseUtil.success(res, user, 'User retrieved successfully');
+      ResponseUtil.success(res, { user }, 'User retrieved successfully');
     } catch (error) {
       next(error);
     }

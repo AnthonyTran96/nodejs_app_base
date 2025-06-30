@@ -13,7 +13,8 @@ export abstract class BaseRepository<T> {
   async findById(id: number): Promise<T | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE id = ? LIMIT 1`;
     const result = await this.db.query<T>(sql, [id]);
-    return result.rows[0] || null;
+    const row = result.rows[0];
+    return row ? this.transformDates(row) : null;
   }
 
   async findAll(options?: PaginationOptions): Promise<PaginatedResult<T>> {
@@ -40,7 +41,7 @@ export abstract class BaseRepository<T> {
     const result = await this.db.query<T>(sql, params);
 
     return {
-      data: result.rows,
+      data: result.rows.map(row => this.transformDates(row)),
       meta: {
         page: options?.page || 1,
         limit: options?.limit || result.rows.length,
@@ -118,6 +119,19 @@ export abstract class BaseRepository<T> {
     params: unknown[] = []
   ): Promise<QueryResult<TResult>> {
     return this.db.query<TResult>(sql, params);
+  }
+
+  protected transformDates(record: any): T {
+    // Transform string dates to Date objects
+    if (record.created_at && typeof record.created_at === 'string') {
+      record.createdAt = new Date(record.created_at);
+      delete record.created_at;
+    }
+    if (record.updated_at && typeof record.updated_at === 'string') {
+      record.updatedAt = new Date(record.updated_at);
+      delete record.updated_at;
+    }
+    return record as T;
   }
 
   private getLastInsertIdSql(): string {

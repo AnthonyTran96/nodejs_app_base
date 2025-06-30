@@ -26,9 +26,9 @@ export class Application {
   async initialize(): Promise<void> {
     await this.setupDatabase();
     this.setupMiddleware();
-    this.setupRoutes();
+    await this.setupDependencies(); // Setup dependencies first
+    this.setupRoutes(); // Then setup routes after dependencies are ready
     this.setupErrorHandling();
-    await this.setupDependencies();
   }
 
   private async setupDatabase(): Promise<void> {
@@ -70,7 +70,7 @@ export class Application {
       });
     });
 
-    // API routes
+    // API routes - mount after dependencies are initialized
     this.app.use(config.apiPrefix, router);
   }
 
@@ -98,7 +98,7 @@ export class Application {
       dependencies: ['UserService'] 
     });
     this.container.register('AuthController', AuthController, { 
-      dependencies: ['AuthService'] 
+      dependencies: ['AuthService', 'UserService'] 
     });
     this.container.register('UserController', UserController, { 
       dependencies: ['UserService'] 

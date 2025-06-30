@@ -26,10 +26,11 @@ router.get('/docs', (_req, res) => {
     message: 'API Documentation',
     endpoints: {
       auth: {
+        'POST /auth/register': 'Register new user',
         'POST /auth/login': 'Login with email and password',
         'POST /auth/refresh': 'Refresh access token',
         'POST /auth/logout': 'Logout user',
-        'GET /auth/me': 'Get current user profile',
+        'GET /auth/profile': 'Get current user profile',
       },
       users: {
         'GET /users': 'Get all users (admin only)',
@@ -49,12 +50,11 @@ export function initializeRoutes(): void {
   try {
     const authController = container.get<AuthController>('AuthController');
     const userController = container.get<UserController>('UserController');
-
+    
     router.use('/auth', createAuthRoutes(authController));
     router.use('/users', createUserRoutes(userController));
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to initialize routes:', error);
+    console.error('❌ Failed to initialize routes:', error);
     // Graceful degradation - routes will be registered when services are available
   }
 } 
