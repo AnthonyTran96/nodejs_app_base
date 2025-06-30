@@ -5,9 +5,9 @@ import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { Server } from 'http';
 
-import { Container } from '@/core/container';
+import { ContainerSetup } from '@/core/container-setup';
 import { DatabaseConnection } from '@/database/connection';
-import { router, initializeRoutes } from '@/core';
+import { router } from '@/core';
 import { errorHandler } from '@/middleware/error-handler';
 import { requestLogger } from '@/middleware/request-logger';
 import { notFoundHandler } from '@/middleware/not-found-handler';
@@ -16,18 +16,18 @@ import { logger } from '@/utils/logger';
 
 export class Application {
   private readonly app: Express;
-  private readonly container: Container;
+  private readonly containerSetup: ContainerSetup;
 
   constructor() {
     this.app = express();
-    this.container = Container.getInstance();
+    this.containerSetup = new ContainerSetup();
   }
 
   async initialize(): Promise<void> {
     await this.setupDatabase();
     this.setupMiddleware();
-    await this.setupDependencies(); // Setup dependencies first
-    this.setupRoutes(); // Then setup routes after dependencies are ready
+    await this.containerSetup.setupDependencies(); // Use ContainerSetup
+    this.setupRoutes(); // Setup routes after dependencies are ready
     this.setupErrorHandling();
   }
 
@@ -79,40 +79,6 @@ export class Application {
   private setupErrorHandling(): void {
     this.app.use(notFoundHandler);
     this.app.use(errorHandler);
-  }
-
-  private async setupDependencies(): Promise<void> {
-    // Import and register services
-    const { UserRepository } = await import('@/user/user.repository');
-    const { UserService } = await import('@/user/user.service');
-    const { AuthService } = await import('@/auth/auth.service');
-    const { AuthController } = await import('@/auth/auth.controller');
-    const { UserController } = await import('@/user/user.controller');
-    const { UnitOfWork } = await import('@/core/unit-of-work');
-
-    // Register services manually
-    this.container.register('UserRepository', UserRepository);
-    this.container.register('UnitOfWork', UnitOfWork);
-    this.container.register('UserService', UserService, {
-      dependencies: ['UserRepository', 'UnitOfWork'],
-    });
-    this.container.register('AuthService', AuthService, {
-      dependencies: ['UserService'],
-    });
-    this.container.register('AuthController', AuthController, {
-      dependencies: ['AuthService', 'UserService'],
-    });
-    this.container.register('UserController', UserController, {
-      dependencies: ['UserService'],
-    });
-
-    // Initialize container
-    await this.container.initialize();
-
-    // Initialize routes after dependencies are registered
-    initializeRoutes();
-
-    logger.info('✅ Dependency injection container initialized');
   }
 
   listen(port: number, callback?: () => void): Server {

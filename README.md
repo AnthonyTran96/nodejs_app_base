@@ -4,10 +4,14 @@ A clean, scalable, and testable Node.js backend with TypeScript, Express, and la
 
 ## 🏗️ Architecture
 
-This project implements a **layered architecture**:
+This project implements a **layered architecture** with **dependency injection**:
 
 ```
 Controllers → Services → Unit of Work → Repositories → Database
+     ↓
+Dependency Injection Container (ContainerSetup)
+     ↓
+Application Bootstrap
 ```
 
 ## 🚀 Features
@@ -15,7 +19,7 @@ Controllers → Services → Unit of Work → Repositories → Database
 ✅ **TypeScript** with strict configuration  
 ✅ **Express.js** web framework  
 ✅ **Layered Architecture** (Controllers, Services, Repositories)  
-✅ **Dependency Injection** container  
+✅ **Dependency Injection** with ContainerSetup  
 ✅ **DTO Validation** with class-validator  
 ✅ **Authentication** (JWT + cookies)  
 ✅ **Authorization** (role-based access control)  
@@ -32,15 +36,29 @@ Controllers → Services → Unit of Work → Repositories → Database
 ```
 src/
 ├── config/              # Environment configuration
-├── core/               # Dependency injection & Unit of Work
+├── core/               # Core infrastructure
+│   ├── container.ts    # Dependency injection container
+│   ├── container-setup.ts # Dependency registration & setup
+│   ├── base.repository.ts # Base repository pattern
+│   ├── unit-of-work.ts # Transaction management
+│   └── index.ts        # Route initialization
 ├── database/           # Database connection & migrations
 ├── middleware/         # Express middleware
 ├── types/              # TypeScript type definitions
 ├── utils/              # Utility functions
 ├── modules/            # Feature modules
 │   ├── auth/           # Authentication module
+│   │   ├── auth.controller.ts
+│   │   ├── auth.service.ts
+│   │   └── auth.routes.ts
 │   └── user/           # User management module
-└── models/             # Data models and interfaces
+│       ├── user.controller.ts
+│       ├── user.service.ts
+│       ├── user.repository.ts
+│       ├── user.routes.ts
+│       └── user.dto.ts
+├── models/             # Data models and interfaces
+└── app.ts              # Application setup (clean & focused)
 
 tests/
 ├── unit/               # Unit tests
@@ -100,6 +118,11 @@ PUT    /api/v1/users/:id      # Update user
 DELETE /api/v1/users/:id      # Delete user (admin only)
 POST   /api/v1/users/change-password  # Change password
 GET    /api/v1/users/stats    # User statistics (admin only)
+```
+
+### API Documentation
+```bash
+GET /api/v1/docs              # API documentation
 ```
 
 ## 🧪 Testing
@@ -165,7 +188,8 @@ The project uses SQLite for development and supports MySQL for production. The d
 ## 📖 Documentation
 
 See [ONBOARDING.md](./ONBOARDING.md) for detailed documentation on:
-- Adding new features
+- Adding new features and modules
+- Dependency injection setup
 - Database migrations
 - Testing strategies
 - Authentication & authorization
@@ -175,8 +199,21 @@ See [ONBOARDING.md](./ONBOARDING.md) for detailed documentation on:
 ## 🌟 Key Components
 
 ### Dependency Injection
-Services are automatically registered and injected:
+Services are automatically registered via ContainerSetup:
 
+```typescript
+// src/core/container-setup.ts
+export class ContainerSetup {
+  async setupDependencies(): Promise<void> {
+    // Import services
+    // Register dependencies
+    // Initialize container
+    // Setup routes
+  }
+}
+```
+
+### Service Registration
 ```typescript
 @Service('UserService')
 export class UserService {
@@ -204,8 +241,23 @@ Clean imports with TypeScript path mapping:
 ```typescript
 import { UserService } from '@/user/user.service';
 import { DatabaseConnection } from '@/database/connection';
+import { ContainerSetup } from '@/core/container-setup';
 import { config } from '@/config/environment';
 import { logger } from '@/utils/logger';
+```
+
+### Application Flow
+```typescript
+// src/app.ts
+export class Application {
+  async initialize(): Promise<void> {
+    await this.setupDatabase();
+    this.setupMiddleware();
+    await this.containerSetup.setupDependencies(); // Clean separation
+    this.setupRoutes();
+    this.setupErrorHandling();
+  }
+}
 ```
 
 ### Response Format
@@ -231,6 +283,7 @@ Standardized API responses:
 - **Testing**: Jest + Supertest
 - **Code Quality**: ESLint + Prettier
 - **Logging**: Winston
+- **Build Tools**: tsc-alias for path resolution
 
 ## 📈 Project Status
 
@@ -239,17 +292,19 @@ Standardized API responses:
 ✅ **Database**: SQLite initialized  
 ✅ **API**: Health endpoint working  
 ✅ **Tests**: 79/79 tests passing  
-✅ **Architecture**: Clean layered structure  
+✅ **Architecture**: Clean layered structure with DI  
 ✅ **Path Aliases**: Configured for clean imports  
 ✅ **Documentation**: Comprehensive guides available  
+✅ **Dependency Injection**: Centralized via ContainerSetup  
 
 ## 🤝 Contributing
 
 1. Follow the established architecture patterns
-2. Add tests for new features
-3. Update documentation as needed
-4. Follow the code style (run `npm run format`)
-5. Ensure all checks pass (`npm run check`)
+2. Use the ContainerSetup for new service registration
+3. Add tests for new features
+4. Update documentation as needed
+5. Follow the code style (run `npm run format`)
+6. Ensure all checks pass (`npm run check`)
 
 ## 📝 License
 
