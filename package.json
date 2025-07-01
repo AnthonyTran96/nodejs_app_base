@@ -19,8 +19,16 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write src/**/*.ts",
     "check": "npm run lint && npm run build",
-    "db:migrate": "ts-node src/shared/database/migrations/index.ts",
-    "db:seed": "ts-node src/shared/database/seeds/index.ts"
+    "db:migrate": "ts-node -r tsconfig-paths/register src/database/migrations/index.ts migrate",
+    "db:migrate:rollback": "ts-node -r tsconfig-paths/register src/database/migrations/index.ts rollback",
+    "db:migrate:status": "ts-node -r tsconfig-paths/register src/database/migrations/index.ts status",
+    "db:seed": "ts-node -r tsconfig-paths/register src/database/seeds/index.ts run",
+    "db:seed:list": "ts-node -r tsconfig-paths/register src/database/seeds/index.ts list",
+    "migrate:dev": "env-cmd -f .env.dev npm run db:migrate",
+    "migrate:rollback:dev": "env-cmd -f .env.dev npm run db:migrate:rollback",
+    "migrate:status:dev": "env-cmd -f .env.dev npm run db:migrate:status",
+    "seed:dev": "env-cmd -f .env.dev npm run db:seed",
+    "seed:list:dev": "env-cmd -f .env.dev npm run db:seed:list"
   },
   "keywords": [
     "nodejs",

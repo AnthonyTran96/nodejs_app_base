@@ -26,7 +26,6 @@ export class DatabaseConnection implements IDBConnection {
         await this.initializeMySQL();
       }
 
-      await this.runMigrations();
       logger.info(`✅ ${this.dbType.toUpperCase()} database initialized`);
     } catch (error) {
       logger.error('Database initialization failed:', error);
@@ -60,22 +59,7 @@ export class DatabaseConnection implements IDBConnection {
     });
   }
 
-  private async runMigrations(): Promise<void> {
-    // Create users table
-    const createUsersTable = `
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY ${this.dbType === 'mysql' ? 'AUTO_INCREMENT' : 'AUTOINCREMENT'},
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        role VARCHAR(50) DEFAULT 'user',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
 
-    await this.execute(createUsersTable);
-  }
 
   async query<T = unknown>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
     if (this.dbType === 'sqlite') {

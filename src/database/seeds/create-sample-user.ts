@@ -1,32 +1,72 @@
-/* eslint-disable no-console */
 import { DatabaseConnection } from '@/database/connection';
 import { HashUtil } from '@/utils/hash';
+import { Seed } from './seed.interface';
+import { logger } from '@/utils/logger';
+import { config } from '@/config/environment';
+import { Role } from '@/types/role.enum';
 
-async function createSampleUser(): Promise<void> {
-  const dbConnection = DatabaseConnection.getInstance();
-  await dbConnection.initialize();
+export class CreateSampleUsersSeed implements Seed {
+  readonly name = 'create_sample_users';
+  readonly order = 1;
 
-  // Create sample admin user
-  const hashedPassword = await HashUtil.hash('admin123');
+  private dbConnection: DatabaseConnection;
 
-  await dbConnection.execute(
-    `INSERT OR REPLACE INTO users (email, password, name, role) VALUES (?, ?, ?, ?)`,
-    ['admin@example.com', hashedPassword, 'Admin User', 'admin']
-  );
+  constructor() {
+    this.dbConnection = DatabaseConnection.getInstance();
+  }
 
-  // Create sample regular user
-  const hashedUserPassword = await HashUtil.hash('user123');
+  async run(): Promise<void> {
+    // Check if users already exist to avoid duplicates
+    const existingAdmin = await this.dbConnection.query(
+      'SELECT id FROM users WHERE email = ?',
+      ['admin@example.com']
+    );
 
-  await dbConnection.execute(
-    `INSERT OR REPLACE INTO users (email, password, name, role) VALUES (?, ?, ?, ?)`,
-    ['user@example.com', hashedUserPassword, 'Regular User', 'user']
-  );
+    const existingUser = await this.dbConnection.query(
+      'SELECT id FROM users WHERE email = ?',
+      ['user@example.com']
+    );
 
-  console.log('✅ Sample users created successfully!');
-  console.log('Admin: admin@example.com / admin123');
-  console.log('User: user@example.com / user123');
+    // Create sample admin user if not exists
+    if (existingAdmin.rows.length === 0) {
+      const hashedPassword = await HashUtil.hash('admin123');
+      
+      const insertSQL = config.database.type === 'sqlite' 
+        ? 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)'
+        : 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)';
 
-  await dbConnection.close();
+      await this.dbConnection.execute(insertSQL, [
+        'admin@example.com',
+        hashedPassword,
+        'Admin User',
+        Role.ADMIN
+      ]);
+
+      logger.info('✅ Admin user created: admin@example.com / admin123');
+    } else {
+      logger.info('ℹ️  Admin user already exists');
+    }
+
+    // Create sample regular user if not exists
+    if (existingUser.rows.length === 0) {
+      const hashedUserPassword = await HashUtil.hash('user123');
+      
+      const insertSQL = config.database.type === 'sqlite' 
+        ? 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)'
+        : 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)';
+
+      await this.dbConnection.execute(insertSQL, [
+        'user@example.com',
+        hashedUserPassword,
+        'Regular User',
+        Role.USER
+      ]);
+
+      logger.info('✅ Regular user created: user@example.com / user123');
+    } else {
+      logger.info('ℹ️  Regular user already exists');
+    }
+
+    logger.info('🎯 Sample users seed completed');
+  }
 }
-
-void createSampleUser();
