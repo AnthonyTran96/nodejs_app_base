@@ -7,7 +7,7 @@ import { Server } from 'http';
 
 import { ContainerSetup } from '@/core/container-setup';
 import { DatabaseConnection } from '@/database/connection';
-import { router } from '@/core';
+import { initializeRoutes, router } from '@/core';
 import { errorHandler } from '@/middleware/error-handler';
 import { requestLogger } from '@/middleware/request-logger';
 import { notFoundHandler } from '@/middleware/not-found-handler';
@@ -26,8 +26,8 @@ export class Application {
   async initialize(): Promise<void> {
     await this.setupDatabase();
     this.setupMiddleware();
-    await this.containerSetup.setupDependencies(); // Use ContainerSetup
-    this.setupRoutes(); // Setup routes after dependencies are ready
+    await this.containerSetup.setupDependencies();
+    this.setupRoutes();
     this.setupErrorHandling();
   }
 
@@ -63,17 +63,19 @@ export class Application {
   }
 
   private setupRoutes(): void {
-    // Health check
-    this.app.get('/health', (_req, res) => {
-      res.json({
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        environment: config.nodeEnv,
-      });
-    });
+    try {
+      // Initialize all module routes through registry system
+      initializeRoutes();
 
-    // API routes - mount after dependencies are initialized
-    this.app.use(config.apiPrefix, router);
+      // Mount API routes with configured prefix
+      this.app.use(config.apiPrefix, router);
+
+      logger.info('✅ Routes initialized successfully');
+      logger.info(`🚀 API available at: ${config.apiPrefix}`);
+    } catch (error) {
+      logger.error('❌ Failed to setup routes:', error);
+      throw error;
+    }
   }
 
   private setupErrorHandling(): void {

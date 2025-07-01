@@ -1,28 +1,37 @@
 # Node.js Backend Base Project
 
-A clean, scalable, and testable Node.js backend with TypeScript, Express, and layered architecture inspired by NestJS.
+A clean, scalable, and testable Node.js backend with TypeScript, Express, layered architecture, and **Module Registry Pattern** for conflict-free development.
 
 ## 🏗️ Architecture
 
-This project implements a **layered architecture** with **dependency injection**:
+This project implements a **layered architecture** with **Module Registry Pattern** for dependency injection:
 
 ```
 Controllers → Services → Unit of Work → Repositories → Database
      ↓
-Dependency Injection Container (ContainerSetup)
+Module Registry System (Self-registering modules)
+     ↓
+Container Setup (Minimal imports)
      ↓
 Application Bootstrap
 ```
+
+### ✨ **Module Registry Benefits:**
+- **🚫 Zero Conflicts**: Multiple developers can add modules without merge conflicts
+- **📦 Self-Contained**: Each module manages its own dependencies
+- **🔄 Parallel Development**: Teams work independently on separate modules
+- **⚡ Type Safe**: Full TypeScript support with compile-time checking
 
 ## 🚀 Features
 
 ✅ **TypeScript** with strict configuration  
 ✅ **Express.js** web framework  
 ✅ **Layered Architecture** (Controllers, Services, Repositories)  
-✅ **Dependency Injection** with ContainerSetup  
+✅ **Module Registry Pattern** - Conflict-free module registration  
+✅ **Role Enum System** - Type-safe role management  
 ✅ **DTO Validation** with class-validator  
 ✅ **Authentication** (JWT + cookies)  
-✅ **Authorization** (role-based access control)  
+✅ **Authorization** (enum-based role access control)  
 ✅ **Database Integration** (SQLite for dev, MySQL for production)  
 ✅ **Repository Pattern** for data access  
 ✅ **Unit of Work** pattern for transactions  
@@ -38,25 +47,33 @@ src/
 ├── config/              # Environment configuration
 ├── core/               # Core infrastructure
 │   ├── container.ts    # Dependency injection container
-│   ├── container-setup.ts # Dependency registration & setup
+│   ├── container-setup.ts # Module registry setup (minimal imports)
+│   ├── module-registry.ts # 📦 Module registry system
+│   ├── core.registry.ts # Core services registration
+│   ├── template.registry.ts.example # Template for new modules
 │   ├── base.repository.ts # Base repository pattern
 │   ├── unit-of-work.ts # Transaction management
 │   └── index.ts        # Route initialization
 ├── database/           # Database connection & migrations
 ├── middleware/         # Express middleware
 ├── types/              # TypeScript type definitions
+│   ├── role.enum.ts    # 🎭 Role enum & type definitions
+│   ├── common.ts       # Common interfaces and types
+│   └── database.ts     # Database-related types
 ├── utils/              # Utility functions
-├── modules/            # Feature modules
+├── modules/            # 📦 Feature modules (self-registering)
 │   ├── auth/           # Authentication module
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
-│   │   └── auth.routes.ts
+│   │   ├── auth.routes.ts
+│   │   └── auth.registry.ts # 🔧 Auth module registration
 │   └── user/           # User management module
 │       ├── user.controller.ts
 │       ├── user.service.ts
 │       ├── user.repository.ts
 │       ├── user.routes.ts
-│       └── user.dto.ts
+│       ├── user.dto.ts
+│       └── user.registry.ts # 🔧 User module registration
 ├── models/             # Data models and interfaces
 └── app.ts              # Application setup (clean & focused)
 
@@ -65,6 +82,60 @@ tests/
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
 ```
+
+## 📦 Module Registry System
+
+This project uses a **Module Registry Pattern** that eliminates merge conflicts when multiple developers add services:
+
+### ✅ **How it works:**
+1. Each module creates a `*.registry.ts` file that self-registers its services
+2. `container-setup.ts` just imports the registry files
+3. **No more conflicts!** Each developer only adds 1 line per module
+
+### 🚀 **Adding a new module:**
+```typescript
+// 1. Create registry file: src/modules/post/post.registry.ts
+ModuleRegistry.registerModule({
+  name: 'PostModule',
+  register: async (container) => {
+    // Import and register module services
+    const { PostService } = await import('./post.service');
+    container.register('PostService', PostService);
+  },
+});
+
+// 2. Add ONE line to container-setup.ts:
+await import('@/modules/post/post.registry');
+```
+
+## 🎭 Role System (Type-Safe)
+
+Using TypeScript enums for **compile-time role safety**:
+
+```typescript
+// src/types/role.enum.ts
+export enum Role {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
+// Usage in controllers:
+import { Role } from '@/types/role.enum';
+
+// Type-safe authorization
+router.delete('/:id', authorize([Role.ADMIN]), deleteHandler);
+
+// Type-safe role checking
+if (user.role === Role.ADMIN) {
+  // Admin logic
+}
+```
+
+### ✅ **Benefits:**
+- ✅ **Compile-time checking** prevents invalid roles
+- ✅ **IDE autocomplete** for role values  
+- ✅ **Single source of truth** for all roles
+- ✅ **Refactor-safe** - renaming updates everywhere
 
 ## 🚀 Quick Start
 
@@ -198,17 +269,30 @@ See [ONBOARDING.md](./ONBOARDING.md) for detailed documentation on:
 
 ## 🌟 Key Components
 
-### Dependency Injection
-Services are automatically registered via ContainerSetup:
+### Module Registry Pattern
+Self-registering modules eliminate conflicts:
 
+```typescript
+// src/modules/user/user.registry.ts
+ModuleRegistry.registerModule({
+  name: 'UserModule',
+  register: async (container: Container) => {
+    const { UserService } = await import('./user.service');
+    container.register('UserService', UserService, {
+      dependencies: ['UserRepository', 'UnitOfWork'],
+    });
+  },
+});
+```
+
+### Container Setup (Minimal)
 ```typescript
 // src/core/container-setup.ts
 export class ContainerSetup {
-  async setupDependencies(): Promise<void> {
-    // Import services
-    // Register dependencies
-    // Initialize container
-    // Setup routes
+  private async loadModules(): Promise<void> {
+    await import('@/modules/user/user.registry');
+    await import('@/modules/auth/auth.registry');
+    // New modules: just add 1 line!
   }
 }
 ```
@@ -222,9 +306,11 @@ export class UserService {
 ```
 
 ### Validation
-Request validation with decorators:
+Request validation with decorators and enum validation:
 
 ```typescript
+import { Role, getRoleValues } from '@/types/role.enum';
+
 export class CreateUserDto {
   @IsEmail()
   email!: string;
@@ -232,6 +318,12 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(8)
   password!: string;
+
+  @IsOptional()
+  @IsEnum(Role, { 
+    message: `Role must be one of: ${getRoleValues().join(', ')}` 
+  })
+  role?: Role = Role.USER; // Type-safe default
 }
 ```
 
@@ -251,11 +343,23 @@ import { logger } from '@/utils/logger';
 // src/app.ts
 export class Application {
   async initialize(): Promise<void> {
-    await this.setupDatabase();
-    this.setupMiddleware();
-    await this.containerSetup.setupDependencies(); // Clean separation
-    this.setupRoutes();
-    this.setupErrorHandling();
+    await this.setupDatabase();           // ✅ Database connection
+    this.setupMiddleware();               // ✅ Express middleware
+    await this.containerSetup.setupDependencies(); // ✅ Module registry + DI
+    this.setupRoutes();                   // ✅ Routes initialization
+    this.setupErrorHandling();            // ✅ Error handling
+  }
+
+  private setupRoutes(): void {
+    try {
+      initializeRoutes();
+      this.app.use(config.apiPrefix, router);
+      logger.info('✅ Routes initialized successfully');
+      logger.info(`🚀 API available at: ${config.apiPrefix}`);
+    } catch (error) {
+      logger.error('❌ Failed to setup routes:', error);
+      throw error;
+    }
   }
 }
 ```
@@ -291,20 +395,39 @@ Standardized API responses:
 ✅ **Server**: Runs on port 3000  
 ✅ **Database**: SQLite initialized  
 ✅ **API**: Health endpoint working  
-✅ **Tests**: 79/79 tests passing  
-✅ **Architecture**: Clean layered structure with DI  
+✅ **Tests**: All tests passing  
+✅ **Architecture**: Clean layered structure with Module Registry  
+✅ **Module Registry**: Zero-conflict module registration  
+✅ **Role System**: Type-safe enum-based roles  
 ✅ **Path Aliases**: Configured for clean imports  
 ✅ **Documentation**: Comprehensive guides available  
-✅ **Dependency Injection**: Centralized via ContainerSetup  
+✅ **Logging**: Route initialization tracking  
 
 ## 🤝 Contributing
 
 1. Follow the established architecture patterns
-2. Use the ContainerSetup for new service registration
-3. Add tests for new features
-4. Update documentation as needed
-5. Follow the code style (run `npm run format`)
-6. Ensure all checks pass (`npm run check`)
+2. **Use Module Registry Pattern** for new modules (see template)
+3. **Use Role enum** for type-safe role management
+4. Add tests for new features
+5. Update documentation as needed
+6. Follow the code style (run `npm run format`)
+7. Ensure all checks pass (`npm run check`)
+
+### 🚀 **Adding New Modules:**
+```bash
+# 1. Copy template
+cp src/core/template.registry.ts.example src/modules/your-module/your-module.registry.ts
+
+# 2. Edit template
+# 3. Add 1 line to container-setup.ts
+# 4. Zero conflicts! ✨
+```
+
+## 📚 Documentation
+
+- **[ONBOARDING.md](docs/ONBOARDING.md)** - Complete development guide
+- **[MODULE_REGISTRY_GUIDE.md](docs/MODULE_REGISTRY_GUIDE.md)** - Module registry system
+- **[README.md](docs/README.md)** - Module registry quick reference
 
 ## 📝 License
 
@@ -312,6 +435,6 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**Ready for development!** 🎉
+**Ready for conflict-free development!** 🎉
 
-For detailed setup instructions and development guidelines, see [ONBOARDING.md](./ONBOARDING.md). 
+Multiple developers can now work in parallel without merge conflicts using the **Module Registry Pattern**. 
