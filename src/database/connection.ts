@@ -59,8 +59,6 @@ export class DatabaseConnection implements IDBConnection {
     });
   }
 
-
-
   async query<T = unknown>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
     if (this.dbType === 'sqlite') {
       return this.querySQLite<T>(sql, params);

@@ -581,7 +581,7 @@ ModuleRegistry.registerModule({
     const { PostRepository } = await import('@/modules/post/post.repository');
     const { PostService } = await import('@/modules/post/post.service');
     const { PostController } = await import('@/modules/post/post.controller');
-
+    
     // Register services with dependencies
     container.register('PostRepository', PostRepository);
     
@@ -591,7 +591,7 @@ ModuleRegistry.registerModule({
 
     container.register('PostController', PostController, {
       dependencies: ['PostService'],
-    });
+  });
   },
 });
 ```

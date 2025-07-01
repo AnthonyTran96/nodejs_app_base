@@ -9,4 +9,4 @@ export interface MigrationRecord {
   version: string;
   name: string;
   executed_at: Date;
-} 
+}

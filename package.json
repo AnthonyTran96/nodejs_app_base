@@ -28,7 +28,12 @@
     "migrate:rollback:dev": "env-cmd -f .env.dev npm run db:migrate:rollback",
     "migrate:status:dev": "env-cmd -f .env.dev npm run db:migrate:status",
     "seed:dev": "env-cmd -f .env.dev npm run db:seed",
-    "seed:list:dev": "env-cmd -f .env.dev npm run db:seed:list"
+    "seed:list:dev": "env-cmd -f .env.dev npm run db:seed:list",
+    "migrate:prod": "env-cmd -f .env.prod npm run db:migrate",
+    "migrate:rollback:prod": "env-cmd -f .env.prod npm run db:migrate:rollback",
+    "migrate:status:prod": "env-cmd -f .env.prod npm run db:migrate:status",
+    "seed:prod": "env-cmd -f .env.prod npm run db:seed",
+    "seed:list:prod": "env-cmd -f .env.prod npm run db:seed:list"
   },
   "keywords": [
     "nodejs",

@@ -40,7 +40,7 @@ function validateEnvironment(): void {
   // 🔐 Required secrets validation
   const requiredSecrets = ['JWT_SECRET', 'JWT_REFRESH_SECRET', 'COOKIE_SECRET'];
   const missingSecrets = requiredSecrets.filter(key => !process.env[key]);
-  
+
   if (missingSecrets.length > 0) {
     errors.push(`Missing required security variables: ${missingSecrets.join(', ')}`);
   }
@@ -55,11 +55,11 @@ function validateEnvironment(): void {
   const nodeEnv = process.env.NODE_ENV;
   if (nodeEnv === 'production') {
     const currentDbType = dbType || 'sqlite';
-    
+
     if (currentDbType === 'mysql') {
       const requiredMySQLVars = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
       const missingMySQLVars = requiredMySQLVars.filter(key => !process.env[key]);
-      
+
       if (missingMySQLVars.length > 0) {
         errors.push(`Production MySQL requires: ${missingMySQLVars.join(', ')}`);
       }
@@ -72,7 +72,9 @@ function validateEnvironment(): void {
     for (const secret of productionSecrets) {
       const value = process.env[secret];
       if (value && value.length < 32) {
-        warnings.push(`🔐 ${secret} is too short for production (minimum 32 characters recommended)`);
+        warnings.push(
+          `🔐 ${secret} is too short for production (minimum 32 characters recommended)`
+        );
       }
       if (value && (value.includes('dev') || value.includes('test') || value.includes('example'))) {
         errors.push(`🚨 ${secret} contains development keywords - not safe for production`);
@@ -93,7 +95,9 @@ function validateEnvironment(): void {
 
   const migrationTimeout = parseInt(process.env.MIGRATION_TIMEOUT_MS || '300000', 10);
   if (process.env.MIGRATION_TIMEOUT_MS && (isNaN(migrationTimeout) || migrationTimeout < 1000)) {
-    errors.push(`Invalid MIGRATION_TIMEOUT_MS: ${process.env.MIGRATION_TIMEOUT_MS}. Must be >= 1000ms`);
+    errors.push(
+      `Invalid MIGRATION_TIMEOUT_MS: ${process.env.MIGRATION_TIMEOUT_MS}. Must be >= 1000ms`
+    );
   }
 
   // 🔧 Migration configuration validation
@@ -103,18 +107,24 @@ function validateEnvironment(): void {
   // Production safety checks
   if (nodeEnv === 'production') {
     if (autoRun) {
-      warnings.push('🚨 AUTO_RUN_MIGRATIONS=true in production - this is risky! Consider manual migration deployment.');
+      warnings.push(
+        '🚨 AUTO_RUN_MIGRATIONS=true in production - this is risky! Consider manual migration deployment.'
+      );
     }
 
     if (allowDataLoss) {
-      errors.push('🚨 ALLOW_DATA_LOSS_MIGRATIONS=true in production - this is dangerous and not recommended!');
+      errors.push(
+        '🚨 ALLOW_DATA_LOSS_MIGRATIONS=true in production - this is dangerous and not recommended!'
+      );
     }
   }
 
   // Development recommendations
   if (nodeEnv === 'development') {
     if (!autoRun && !process.env.AUTO_RUN_MIGRATIONS) {
-      warnings.push('💡 Consider setting AUTO_RUN_MIGRATIONS=true in development for faster iteration');
+      warnings.push(
+        '💡 Consider setting AUTO_RUN_MIGRATIONS=true in development for faster iteration'
+      );
     }
   }
 
@@ -135,7 +145,9 @@ function validateEnvironment(): void {
     console.error('❌ Environment Configuration Errors:');
     errors.forEach(error => console.error(`   ${error}`));
     console.error('');
-    throw new Error(`Environment validation failed with ${errors.length} error(s). Please check your configuration.`);
+    throw new Error(
+      `Environment validation failed with ${errors.length} error(s). Please check your configuration.`
+    );
   }
 
   // ✅ Success message
@@ -163,8 +175,8 @@ export const config: Config = {
 
   migration: {
     autoRun: process.env.AUTO_RUN_MIGRATIONS === 'true',
-    requireManualApproval: process.env.REQUIRE_MIGRATION_APPROVAL === 'true' || 
-                          process.env.NODE_ENV === 'production',
+    requireManualApproval:
+      process.env.REQUIRE_MIGRATION_APPROVAL === 'true' || process.env.NODE_ENV === 'production',
     allowDataLoss: process.env.ALLOW_DATA_LOSS_MIGRATIONS === 'true',
     timeoutMs: parseInt(process.env.MIGRATION_TIMEOUT_MS || '300000', 10),
   },

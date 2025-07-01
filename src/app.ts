@@ -50,16 +50,18 @@ export class Application {
       } else {
         logger.info('ℹ️  Auto-run migrations disabled - checking for pending migrations...');
         const pendingMigrations = await migrationManager.checkPendingMigrations();
-        
+
         if (pendingMigrations.length > 0) {
           if (config.nodeEnv === 'production') {
             logger.error('🚨 PRODUCTION: Pending migrations detected but auto-run is disabled');
             logger.error('   This may cause application errors if schema changes are required');
             logger.error('   Run migrations manually: yarn db:migrate');
-            
+
             // Optionally throw error to prevent production startup with pending migrations
             if (config.migration.requireManualApproval) {
-              throw new Error('Pending migrations detected in production. Run migrations manually before starting the application.');
+              throw new Error(
+                'Pending migrations detected in production. Run migrations manually before starting the application.'
+              );
             }
           } else {
             logger.warn('⚠️  Pending migrations detected. Consider running: yarn db:migrate');

@@ -6,7 +6,7 @@ import { logger } from '@/utils/logger';
 // Register all seeds here
 export function registerSeeds(seedManager: SeedManager): void {
   seedManager.registerSeed(new CreateSampleUsersSeed());
-  
+
   // Add future seeds here in order:
   // seedManager.registerSeed(new AnotherSeed());
 }
@@ -87,4 +87,4 @@ async function main(): Promise<void> {
 // Run CLI if this file is executed directly
 if (require.main === module) {
   void main();
-} 
+}

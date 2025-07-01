@@ -49,7 +49,7 @@ export class MigrationManager {
       for (const migration of pendingMigrations) {
         logger.warn(`   📋 ${migration.version} - ${migration.name}`);
       }
-      
+
       if (config.nodeEnv === 'production') {
         logger.warn('🚨 PRODUCTION: Run migrations manually before starting app');
         logger.warn('   Command: yarn db:migrate');
@@ -97,27 +97,27 @@ export class MigrationManager {
 
   private async runSingleMigration(migration: Migration): Promise<void> {
     const startTime = Date.now();
-    
+
     try {
       await this.dbConnection.beginTransaction();
-      
+
       logger.info(`⏳ Running migration: ${migration.version} - ${migration.name}`);
 
       // 🕐 Run migration with timeout
       await this.runWithTimeout(
-        migration.up.bind(migration), 
+        migration.up.bind(migration),
         config.migration.timeoutMs,
         `Migration ${migration.version} timed out`
       );
-      
+
       // Record migration execution
-      await this.dbConnection.execute(
-        'INSERT INTO migrations (version, name) VALUES (?, ?)',
-        [migration.version, migration.name]
-      );
+      await this.dbConnection.execute('INSERT INTO migrations (version, name) VALUES (?, ?)', [
+        migration.version,
+        migration.name,
+      ]);
 
       await this.dbConnection.commit();
-      
+
       const duration = Date.now() - startTime;
       logger.info(`✅ Migration completed: ${migration.version} (${duration}ms)`);
     } catch (error) {
@@ -129,8 +129,8 @@ export class MigrationManager {
   }
 
   private async runWithTimeout<T>(
-    promise: () => Promise<T>, 
-    timeoutMs: number, 
+    promise: () => Promise<T>,
+    timeoutMs: number,
     timeoutMessage: string
   ): Promise<T> {
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -171,24 +171,23 @@ export class MigrationManager {
 
     try {
       await this.dbConnection.beginTransaction();
-      
+
       logger.info(`⏳ Rolling back migration: ${migration.version} - ${migration.name}`);
-      
+
       // 🕐 Run rollback with timeout
       await this.runWithTimeout(
         migration.down.bind(migration),
         config.migration.timeoutMs,
         `Rollback ${migration.version} timed out`
       );
-      
+
       // Remove migration record
-      await this.dbConnection.execute(
-        'DELETE FROM migrations WHERE version = ?',
-        [migration.version]
-      );
+      await this.dbConnection.execute('DELETE FROM migrations WHERE version = ?', [
+        migration.version,
+      ]);
 
       await this.dbConnection.commit();
-      
+
       const duration = Date.now() - startTime;
       logger.info(`✅ Migration rolled back: ${migration.version} (${duration}ms)`);
     } catch (error) {
@@ -215,10 +214,12 @@ export class MigrationManager {
     logger.info('📊 Migration Status:');
     logger.info(`   Environment: ${config.nodeEnv}`);
     logger.info(`   Auto-run: ${config.migration.autoRun ? '✅ Enabled' : '❌ Disabled'}`);
-    logger.info(`   Manual approval: ${config.migration.requireManualApproval ? '✅ Required' : '❌ Not required'}`);
+    logger.info(
+      `   Manual approval: ${config.migration.requireManualApproval ? '✅ Required' : '❌ Not required'}`
+    );
     logger.info(`   Timeout: ${config.migration.timeoutMs}ms`);
     logger.info('');
-    
+
     if (this.migrations.length === 0) {
       logger.info('   No migrations registered');
       return;
@@ -232,6 +233,8 @@ export class MigrationManager {
     }
 
     const pendingCount = this.migrations.filter(m => !executedVersions.has(m.version)).length;
-    logger.info(`\n📈 Summary: ${this.migrations.length} total | ${executedMigrations.length} executed | ${pendingCount} pending`);
+    logger.info(
+      `\n📈 Summary: ${this.migrations.length} total | ${executedMigrations.length} executed | ${pendingCount} pending`
+    );
   }
-} 
+}

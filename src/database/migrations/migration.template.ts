@@ -14,7 +14,7 @@ export class TemplateMigration implements Migration {
 
   async up(): Promise<void> {
     const isMySQL = config.database.type === 'mysql';
-    
+
     // Write your migration logic here
     // Example: Create table
     const createTableSQL = `
@@ -73,4 +73,4 @@ NOTES:
 - Consider database type differences (MySQL vs SQLite)
 - Make migrations atomic (use transactions when needed)
 - Never modify existing migrations that have been run in production
-*/ 
+*/

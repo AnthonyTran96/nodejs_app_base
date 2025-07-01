@@ -38,7 +38,7 @@ export class SeedManager {
 
   async runSeed(seedName: string): Promise<void> {
     const seed = this.seeds.find(s => s.name === seedName);
-    
+
     if (!seed) {
       throw new Error(`Seed "${seedName}" not found`);
     }
@@ -55,7 +55,7 @@ export class SeedManager {
 
   listSeeds(): void {
     logger.info('📋 Available Seeds:');
-    
+
     if (this.seeds.length === 0) {
       logger.info('  No seeds registered');
       return;
@@ -65,4 +65,4 @@ export class SeedManager {
       logger.info(`  ${seed.order}. ${seed.name}`);
     }
   }
-} 
+}

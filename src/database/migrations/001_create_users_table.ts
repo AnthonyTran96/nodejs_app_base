@@ -14,7 +14,7 @@ export class CreateUsersTableMigration implements Migration {
 
   async up(): Promise<void> {
     const isMySQL = config.database.type === 'mysql';
-    
+
     const createUsersTable = `
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY ${isMySQL ? 'AUTO_INCREMENT' : 'AUTOINCREMENT'},
@@ -31,7 +31,7 @@ export class CreateUsersTableMigration implements Migration {
 
     // Create index for email (performance optimization)
     await this.dbConnection.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
-    
+
     // Create index for role (for authorization queries)
     await this.dbConnection.execute('CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)');
   }
@@ -40,8 +40,8 @@ export class CreateUsersTableMigration implements Migration {
     // Drop indexes first
     await this.dbConnection.execute('DROP INDEX IF EXISTS idx_users_email');
     await this.dbConnection.execute('DROP INDEX IF EXISTS idx_users_role');
-    
+
     // Drop table
     await this.dbConnection.execute('DROP TABLE IF EXISTS users');
   }
-} 
+}

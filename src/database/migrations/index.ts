@@ -6,7 +6,7 @@ import { logger } from '@/utils/logger';
 // Register all migrations here
 export function registerMigrations(migrationManager: MigrationManager): void {
   migrationManager.registerMigration(new CreateUsersTableMigration());
-  
+
   // Add future migrations here:
   // migrationManager.registerMigration(new NextMigration());
 }
@@ -81,4 +81,4 @@ async function main(): Promise<void> {
 // Run CLI if this file is executed directly
 if (require.main === module) {
   void main();
-} 
+}
