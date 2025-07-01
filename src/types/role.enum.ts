@@ -12,4 +12,4 @@ export const isValidRole = (role: string): role is Role => {
 
 export const getRoleValues = (): string[] => {
   return Object.values(Role);
-}; 
+};

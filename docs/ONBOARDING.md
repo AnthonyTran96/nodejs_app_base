@@ -35,6 +35,9 @@ src/
 ├── database/           # Database connection and migrations
 ├── middleware/         # Express middleware (auth, validation, etc.)
 ├── types/              # TypeScript type definitions
+│   ├── role.enum.ts    # 🎭 Role enum and type definitions
+│   ├── common.ts       # Common interfaces and types
+│   └── database.ts     # Database-related types
 ├── utils/              # Utility functions (logger, response, hash)
 ├── modules/            # 📦 Feature modules
 │   ├── auth/           # Authentication module
@@ -53,6 +56,85 @@ tests/
 ├── unit/               # Unit tests
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
+```
+
+## 🎭 Role System & Type Safety
+
+This project uses a **TypeScript enum-based role system** for enhanced type safety and maintainability.
+
+### Role Enum Definition
+
+```typescript
+// src/types/role.enum.ts
+export enum Role {
+  USER = 'user',
+  ADMIN = 'admin',
+}
+
+export type RoleType = Role;
+
+// Helper functions for role operations
+export const isValidRole = (role: string): role is Role => {
+  return Object.values(Role).includes(role as Role);
+};
+
+export const getRoleValues = (): string[] => {
+  return Object.values(Role);
+};
+```
+
+### Benefits of Enum-Based Roles
+
+- ✅ **Type Safety**: Compile-time checking prevents invalid role assignments
+- ✅ **Single Source of Truth**: All role values defined in one place
+- ✅ **IDE Support**: Autocomplete and IntelliSense for role values
+- ✅ **Refactoring Safety**: Renaming roles updates all usages automatically
+- ✅ **Runtime Validation**: Helper functions for dynamic validation
+
+### Usage in Models and DTOs
+
+```typescript
+// src/models/user.model.ts
+import { Role } from '@/types/role.enum';
+
+export interface User {
+  id: number;
+  email: string;
+  role: Role; // Type-safe role property
+  // ... other properties
+}
+
+// src/modules/user/user.dto.ts
+import { Role, getRoleValues } from '@/types/role.enum';
+import { IsEnum, IsOptional } from 'class-validator';
+
+export class CreateUserDto {
+  @IsOptional()
+  @IsEnum(Role, { message: `Role must be one of: ${getRoleValues().join(', ')}` })
+  role?: Role = Role.USER; // Default to USER role
+}
+```
+
+### Authorization with Role Guards
+
+```typescript
+// Import the Role enum
+import { Role } from '@/types/role.enum';
+import { AuthGuard, authorize } from '@/middleware/auth.middleware';
+
+// Single role authorization
+router.delete('/:id', authorize([Role.ADMIN]), deleteHandler);
+
+// Multiple roles authorization  
+router.get('/dashboard', authorize([Role.ADMIN, Role.USER]), dashboardHandler);
+
+// In controller methods
+async deletePost(req: AuthenticatedRequest, res: Response): Promise<void> {
+  // Type-safe role checking
+  if (req.user?.role === Role.ADMIN) {
+    // Admin-specific logic
+  }
+}
 ```
 
 ## 🚀 Getting Started
@@ -106,21 +188,17 @@ export class Application {
 }
 ```
 
-### Dependency Injection with ContainerSetup
+### Dependency Injection with Module Registry
 
 ```typescript
-// src/core/container-setup.ts - Centralized service registration
+// src/core/container-setup.ts - Module Registry Pattern
 export class ContainerSetup {
   async setupDependencies(): Promise<void> {
-    // 1. Import all services
-    const { UserRepository } = await import('@/user/user.repository');
-    const { UserService } = await import('@/user/user.service');
+    // 1. Load all module registries (auto-registers)
+    await this.loadModules();
     
-    // 2. Register with dependencies
-    this.container.register('UserRepository', UserRepository);
-    this.container.register('UserService', UserService, {
-      dependencies: ['UserRepository', 'UnitOfWork'],
-    });
+    // 2. Initialize all registered modules
+    await ModuleRegistry.initializeAllModules(this.container);
     
     // 3. Initialize container
     await this.container.initialize();
@@ -128,8 +206,34 @@ export class ContainerSetup {
     // 4. Initialize routes
     initializeRoutes();
   }
+
+  private async loadModules(): Promise<void> {
+    // Each module self-registers when imported
+    await import('@/core/core.registry');
+    await import('@/modules/user/user.registry');
+    await import('@/modules/auth/auth.registry');
+    // 🎯 New modules: just add one line!
+  }
 }
 ```
+
+## 📦 Module Registry System
+
+This project uses a **Module Registry Pattern** to eliminate merge conflicts when multiple developers add services.
+
+### ✅ Benefits:
+- **Parallel Development**: Each developer works on separate modules
+- **Minimal Conflicts**: Only need to add 1 line per new module
+- **Clear Ownership**: Each module manages its own dependencies
+- **Type Safety**: Full TypeScript support
+
+### 🎯 How it works:
+1. Each module creates a `*.registry.ts` file
+2. The registry file self-registers all module services
+3. `container-setup.ts` just imports the registry files
+4. **No more massive merge conflicts!** 🎉
+
+📚 **Detailed Guide**: See `docs/MODULE_REGISTRY_GUIDE.md`
 
 ## 🆕 Adding a New Feature Module
 
@@ -139,7 +243,6 @@ Follow these steps to add a new feature (e.g., "Posts"):
 
 ```bash
 mkdir src/modules/post
-touch src/modules/post/post.model.ts
 touch src/modules/post/post.dto.ts
 touch src/modules/post/post.repository.ts
 touch src/modules/post/post.service.ts
@@ -417,9 +520,10 @@ export class PostController {
 import { Router } from 'express';
 import { PostController } from '@/modules/post/post.controller';
 import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
-import { AuthGuard, RoleGuard } from '@/middleware/auth.middleware';
+import { AuthGuard, authorize } from '@/middleware/auth.middleware';
 import { CreatePostDto, UpdatePostDto } from '@/modules/post/post.dto';
 import { IdParamDto, PaginationDto } from '@/types/common.dto';
+import { Role } from '@/types/role.enum';
 
 export function createPostRoutes(postController: PostController): Router {
   const router = Router();
@@ -454,7 +558,7 @@ export function createPostRoutes(postController: PostController): Router {
 
   router.delete(
     '/:id',
-    RoleGuard('admin'), // Only admins can delete
+    authorize([Role.ADMIN]), // Only admins can delete
     ValidateParams(IdParamDto),
     postController.deletePost.bind(postController)
   );
@@ -463,70 +567,48 @@ export function createPostRoutes(postController: PostController): Router {
 }
 ```
 
-### 8. Register in ContainerSetup
+### 8. Create Module Registry
 
 ```typescript
-// src/core/container-setup.ts - Add to existing file
-async setupDependencies(): Promise<void> {
-  try {
-    // Import all services (add new import)
+// src/modules/post/post.registry.ts - Create this new file
+import { Container } from '@/core/container';
+import { ModuleRegistry } from '@/core/module-registry';
+
+ModuleRegistry.registerModule({
+  name: 'PostModule',
+  register: async (container: Container) => {
+    // Import services for this module only
     const { PostRepository } = await import('@/modules/post/post.repository');
     const { PostService } = await import('@/modules/post/post.service');
     const { PostController } = await import('@/modules/post/post.controller');
+
+    // Register services with dependencies
+    container.register('PostRepository', PostRepository);
     
-    // ... existing imports ...
-
-    // Register services with their dependencies
-    this.registerCoreServices(UnitOfWork);
-    this.registerRepositories(UserRepository, PostRepository); // Add PostRepository
-    this.registerServices(UserService, AuthService, PostService); // Add PostService
-    this.registerControllers(AuthController, UserController, PostController); // Add PostController
-
-    // ... rest of setup
-  }
-}
-
-private registerRepositories(UserRepository: any, PostRepository?: any): void {
-  this.container.register('UserRepository', UserRepository);
-  if (PostRepository) {
-    this.container.register('PostRepository', PostRepository);
-  }
-}
-
-private registerServices(UserService: any, AuthService: any, PostService?: any): void {
-  this.container.register('UserService', UserService, {
-    dependencies: ['UserRepository', 'UnitOfWork'],
-  });
-
-  this.container.register('AuthService', AuthService, {
-    dependencies: ['UserService'],
-  });
-
-  if (PostService) {
-    this.container.register('PostService', PostService, {
+    container.register('PostService', PostService, {
       dependencies: ['PostRepository', 'UnitOfWork'],
     });
-  }
-}
 
-private registerControllers(AuthController: any, UserController: any, PostController?: any): void {
-  this.container.register('AuthController', AuthController, {
-    dependencies: ['AuthService', 'UserService'],
-  });
-
-  this.container.register('UserController', UserController, {
-    dependencies: ['UserService'],
-  });
-
-  if (PostController) {
-    this.container.register('PostController', PostController, {
+    container.register('PostController', PostController, {
       dependencies: ['PostService'],
     });
-  }
+  },
+});
+```
+
+### 9. Add to Container Setup
+
+```typescript
+// src/core/container-setup.ts - Just add ONE line!
+private async loadModules(): Promise<void> {
+  await import('@/core/core.registry');
+  await import('@/modules/user/user.registry');
+  await import('@/modules/auth/auth.registry');
+  await import('@/modules/post/post.registry'); // ✅ Just add this line!
 }
 ```
 
-### 9. Register Routes
+### 10. Register Routes
 
 ```typescript
 // src/core/index.ts - Add to initializeRoutes function
@@ -545,7 +627,7 @@ export function initializeRoutes(): void {
 }
 ```
 
-### 10. Database Migration
+### 11. Database Migration
 
 ```typescript
 // src/database/connection.ts - Add to runMigrations method
@@ -713,18 +795,34 @@ describe('Posts E2E Tests', () => {
 ### Using Guards
 
 ```typescript
+// Import required modules
+import { AuthGuard, authorize } from '@/middleware/auth.middleware';
+import { Role } from '@/types/role.enum';
+
 // In route definitions
 router.use(AuthGuard);                    // Require authentication
-router.use(RoleGuard('admin'));           // Require admin role
-router.delete('/:id', RoleGuard('admin')); // Admin-only endpoint
+router.use(authorize([Role.ADMIN]));      // Require admin role
+router.delete('/:id', authorize([Role.ADMIN])); // Admin-only endpoint
+
+// Multiple roles
+router.get('/dashboard', authorize([Role.ADMIN, Role.USER])); // Admin or User access
 ```
 
 ### Accessing User in Controllers
 
 ```typescript
+import { Role } from '@/types/role.enum';
+
 async createPost(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = req.user?.userId;  // Available after AuthGuard
-  const userRole = req.user?.role;  // User role for authorization
+  const userRole = req.user?.role;  // User role for authorization (type: Role)
+  
+  // Type-safe role checking
+  if (userRole === Role.ADMIN) {
+    // Admin-specific logic
+  } else if (userRole === Role.USER) {
+    // User-specific logic
+  }
   
   const postData = { ...req.body, authorId: userId };
   // ...
@@ -733,10 +831,11 @@ async createPost(req: AuthenticatedRequest, res: Response): Promise<void> {
 
 ## 📝 Validation
 
-Use class-validator decorators:
+Use class-validator decorators with enum validation:
 
 ```typescript
-import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsBoolean } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsBoolean, IsEnum, IsString, Length } from 'class-validator';
+import { Role, getRoleValues } from '@/types/role.enum';
 
 export class CreatePostDto {
   @IsNotEmpty()
@@ -752,6 +851,22 @@ export class CreatePostDto {
   @IsOptional()
   @IsBoolean()
   published?: boolean;
+}
+
+export class CreateUserDto {
+  @IsNotEmpty()
+  @IsEmail()
+  email!: string;
+
+  @IsNotEmpty()
+  @MinLength(8)
+  password!: string;
+
+  @IsOptional()
+  @IsEnum(Role, { 
+    message: `Role must be one of: ${getRoleValues().join(', ')}` 
+  })
+  role?: Role = Role.USER; // Default to USER role
 }
 ```
 
@@ -808,11 +923,39 @@ const postService = container.get<PostService>('PostService');
 2. **Use parameterized queries** (automatically handled by repositories)  
 3. **Hash sensitive data** using appropriate utilities
 4. **Implement proper authentication** with JWT tokens
-5. **Use role-based authorization** with guards
-6. **Sanitize data** before database operations
-7. **Use HTTPS in production**
-8. **Keep dependencies updated**
-9. **Log security events** appropriately
+5. **Use role-based authorization** with enum-based guards for type safety
+6. **Validate roles** using `Role` enum and `isValidRole()` helper function
+7. **Sanitize data** before database operations
+8. **Use HTTPS in production**
+9. **Keep dependencies updated**
+10. **Log security events** appropriately
+
+### Role Security Guidelines
+
+```typescript
+import { Role, isValidRole } from '@/types/role.enum';
+
+// ✅ Good: Type-safe role checking
+if (user.role === Role.ADMIN) {
+  // Admin logic
+}
+
+// ✅ Good: Dynamic role validation
+if (isValidRole(inputRole)) {
+  user.role = inputRole as Role;
+}
+
+// ❌ Bad: Using string literals
+if (user.role === 'admin') { // No type safety
+  // Admin logic
+}
+
+// ✅ Good: Enum-based authorization
+router.delete('/:id', authorize([Role.ADMIN]));
+
+// ❌ Bad: String-based authorization  
+router.delete('/:id', authorize(['admin'])); // No compile-time checking
+```
 
 ## 📊 Environment Configuration
 
@@ -917,11 +1060,36 @@ async findByAuthor(authorId: number): Promise<Post[]> {
 }
 ```
 
+### Role-Related Debugging
+
+```typescript
+import { Role, isValidRole, getRoleValues } from '@/types/role.enum';
+
+// Debug role validation
+console.log('Available roles:', getRoleValues());
+console.log('Is valid role:', isValidRole('admin')); // true
+console.log('Is valid role:', isValidRole('invalid')); // false
+
+// Debug user role in controllers
+async someController(req: AuthenticatedRequest, res: Response): Promise<void> {
+  console.log('User role:', req.user?.role);
+  console.log('Is admin:', req.user?.role === Role.ADMIN);
+  console.log('Role type:', typeof req.user?.role);
+}
+
+// Debug enum compilation
+console.log('Role enum values:', Object.values(Role));
+console.log('Role.ADMIN value:', Role.ADMIN); // 'admin'
+console.log('Role.USER value:', Role.USER);   // 'user'
+```
+
 ## 📚 Additional Resources
 
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
+- [TypeScript Enums](https://www.typescriptlang.org/docs/handbook/enums.html) - Learn more about enum usage and best practices
 - [Express.js Guide](https://expressjs.com/en/guide/)
 - [Class Validator Documentation](https://github.com/typestack/class-validator)
+- [Class Validator Enum Validation](https://github.com/typestack/class-validator#validation-decorators) - Using @IsEnum decorator
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
 - [Supertest for API Testing](https://github.com/ladjs/supertest)
 

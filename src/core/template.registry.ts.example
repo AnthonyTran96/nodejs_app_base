@@ -1,0 +1,31 @@
+import { Container } from '@/core/container';
+import { ModuleRegistry } from '@/core/module-registry';
+
+// Template for new module registration
+// Copy this file and rename it to match your module name
+// Example: post.registry.ts, product.registry.ts, etc.
+
+ModuleRegistry.registerModule({
+  name: 'YourModuleName', // Change this to your module name
+  register: async (container: Container) => {
+    // Import your module's services
+    // const { YourRepository } = await import('@/modules/your-module/your.repository');
+    // const { YourService } = await import('@/modules/your-module/your.service');
+    // const { YourController } = await import('@/modules/your-module/your.controller');
+
+    // Register your module's services with dependencies
+    // container.register('YourRepository', YourRepository);
+    
+    // container.register('YourService', YourService, {
+    //   dependencies: ['YourRepository', 'UnitOfWork'],
+    // });
+
+    // container.register('YourController', YourController, {
+    //   dependencies: ['YourService'],
+    // });
+  },
+});
+
+// Don't forget to:
+// 1. Add your registry import to src/core/container-setup.ts in loadModules()
+// 2. Add your routes to src/core/index.ts in initializeRoutes() 
