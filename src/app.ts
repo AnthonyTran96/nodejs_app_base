@@ -46,7 +46,7 @@ export class Application {
 
       if (config.migration.autoRun) {
         logger.info('🚀 Auto-run migrations enabled - running pending migrations...');
-        await migrationManager.runPendingMigrations();
+        await migrationManager.runPendingMigrations(false); // false = auto-run, not manual
       } else {
         logger.info('ℹ️  Auto-run migrations disabled - checking for pending migrations...');
         const pendingMigrations = await migrationManager.checkPendingMigrations();

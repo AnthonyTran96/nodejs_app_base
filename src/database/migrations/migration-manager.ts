@@ -63,11 +63,11 @@ export class MigrationManager {
     return pendingMigrations;
   }
 
-  async runPendingMigrations(): Promise<void> {
-    // 🔒 Safety check for production
-    if (config.nodeEnv === 'production' && !config.migration.autoRun) {
+  async runPendingMigrations(forceManual: boolean = false): Promise<void> {
+    // 🔒 Safety check for production AUTO-RUN (but allow manual)
+    if (config.nodeEnv === 'production' && !config.migration.autoRun && !forceManual) {
       logger.error('🚨 Auto-migration is disabled in production for safety');
-      logger.error('   Set AUTO_RUN_MIGRATIONS=true in .env to override (not recommended)');
+      logger.error('   Use manual migration command: npm run migrate:prod');
       throw new Error('Auto-migration disabled in production environment');
     }
 

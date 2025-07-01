@@ -18,7 +18,8 @@ export async function runMigrations(): Promise<void> {
   const migrationManager = new MigrationManager();
   registerMigrations(migrationManager);
 
-  await migrationManager.runPendingMigrations();
+  // CLI migrations are manual migrations, so force manual = true
+  await migrationManager.runPendingMigrations(true);
   await dbConnection.close();
 }
 
