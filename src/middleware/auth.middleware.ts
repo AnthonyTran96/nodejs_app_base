@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '@/config/environment';
 import { JwtPayload, AuthenticatedRequest } from '@/types/common';
 import { UnauthorizedError, ForbiddenError } from '@/middleware/error-handler';
+import { Role } from '@/types/role.enum';
 
 export class AuthMiddleware {
   static authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
@@ -26,7 +27,7 @@ export class AuthMiddleware {
     }
   }
 
-  static authorize(...roles: string[]) {
+  static authorize(...roles: Role[]) {
     return (req: AuthenticatedRequest, _res: Response, next: NextFunction): void => {
       if (!req.user) {
         next(new UnauthorizedError('Authentication required'));

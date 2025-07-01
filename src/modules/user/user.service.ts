@@ -5,6 +5,7 @@ import { User, CreateUserRequest, UpdateUserRequest, UserResponse } from '@/mode
 import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { ValidationError, NotFoundError } from '@/middleware/error-handler';
 import { Service } from '@/core/container';
+import { Role } from '@/types/role.enum';
 
 @Service('UserService')
 export class UserService {
@@ -110,8 +111,8 @@ export class UserService {
   async getUserStats(): Promise<{ totalUsers: number; adminCount: number; userCount: number }> {
     const [totalUsers, adminCount, userCount] = await Promise.all([
       this.userRepository.findAll().then(result => result.meta.total),
-      this.userRepository.countByRole('admin'),
-      this.userRepository.countByRole('user'),
+      this.userRepository.countByRole(Role.ADMIN),
+      this.userRepository.countByRole(Role.USER),
     ]);
 
     return {

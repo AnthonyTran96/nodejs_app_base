@@ -1,6 +1,7 @@
 import { BaseRepository } from '@/core/base.repository';
 import { User } from '@/models/user.model';
 import { Service } from '@/core/container';
+import { Role } from '@/types/role.enum';
 
 @Service('UserRepository')
 export class UserRepository extends BaseRepository<User> {
@@ -13,7 +14,7 @@ export class UserRepository extends BaseRepository<User> {
     return row ? this.transformDates(row) : null;
   }
 
-  async findByRole(role: string): Promise<User[]> {
+  async findByRole(role: Role): Promise<User[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE role = ?`;
     const result = await this.executeQuery<User>(sql, [role]);
     return result.rows.map(row => this.transformDates(row));
@@ -41,7 +42,7 @@ export class UserRepository extends BaseRepository<User> {
     await this.db.execute(sql, [userId]);
   }
 
-  async countByRole(role: string): Promise<number> {
+  async countByRole(role: Role): Promise<number> {
     const sql = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE role = ?`;
     const result = await this.executeQuery<{ count: number }>(sql, [role]);
     return result.rows[0]?.count || 0;

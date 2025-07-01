@@ -1,13 +1,10 @@
 import { Router } from 'express';
 import { UserController } from '@/user/user.controller';
-import {
-  ValidateBody,
-  ValidateParams,
-  ValidateQuery,
-} from '@/middleware/validation.middleware';
+import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
 import { AuthGuard, RoleGuard } from '@/middleware/auth.middleware';
 import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from '@/user/user.dto';
 import { IdParamDto, PaginationDto } from '@/types/common.dto';
+import { Role } from '@/types/role.enum';
 
 export function createUserRoutes(userController: UserController): Router {
   const router = Router();
@@ -20,18 +17,18 @@ export function createUserRoutes(userController: UserController): Router {
   // User management (admin only)
   router.get(
     '/',
-    RoleGuard('admin'),
+    RoleGuard(Role.ADMIN),
     ValidateQuery(PaginationDto),
     userController.getUsers.bind(userController)
   );
 
-  router.get('/stats', RoleGuard('admin'), userController.getUserStats.bind(userController));
+  router.get('/stats', RoleGuard(Role.ADMIN), userController.getUserStats.bind(userController));
 
   router.get('/:id', ValidateParams(IdParamDto), userController.getUserById.bind(userController));
 
   router.post(
     '/',
-    RoleGuard('admin'),
+    RoleGuard(Role.ADMIN),
     ValidateBody(CreateUserDto),
     userController.createUser.bind(userController)
   );
@@ -45,7 +42,7 @@ export function createUserRoutes(userController: UserController): Router {
 
   router.delete(
     '/:id',
-    RoleGuard('admin'),
+    RoleGuard(Role.ADMIN),
     ValidateParams(IdParamDto),
     userController.deleteUser.bind(userController)
   );

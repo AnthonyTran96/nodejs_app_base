@@ -4,6 +4,7 @@ import { UnitOfWork } from '@/core/unit-of-work';
 import { ValidationError, NotFoundError } from '@/middleware/error-handler';
 import { HashUtil } from '@/utils/hash';
 import { User } from '../../../src/models/user.model';
+import { Role } from '@/types/role.enum';
 
 // Mock dependencies
 jest.mock('@/user/user.repository');
@@ -20,7 +21,7 @@ describe('UserService', () => {
     email: 'test@example.com',
     password: 'hashedPassword',
     name: 'Test User',
-    role: 'user',
+    role: Role.USER,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
   };
@@ -86,7 +87,7 @@ describe('UserService', () => {
       email: 'newuser@example.com',
       password: 'password123',
       name: 'New User',
-      role: 'user',
+      role: Role.USER,
     };
 
     it('should create user successfully', async () => {
@@ -243,8 +244,8 @@ describe('UserService', () => {
         adminCount: 10,
         userCount: 90,
       });
-      expect(mockUserRepository.countByRole).toHaveBeenCalledWith('admin');
-      expect(mockUserRepository.countByRole).toHaveBeenCalledWith('user');
+          expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.ADMIN);
+    expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.USER);
     });
   });
 }); 

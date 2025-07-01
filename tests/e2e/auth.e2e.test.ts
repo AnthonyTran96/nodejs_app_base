@@ -4,6 +4,7 @@ import { DatabaseConnection } from '@/database/connection';
 import { Container } from '@/core/container';
 import { UserRepository } from '@/user/user.repository';
 import { HashUtil } from '@/utils/hash';
+import { Role } from '@/types/role.enum';
 
 describe('Auth E2E Tests', () => {
   let app: Application;
@@ -34,7 +35,7 @@ describe('Auth E2E Tests', () => {
       email: 'test@example.com',
       password: 'password123',
       name: 'Test User',
-      role: 'user',
+      role: Role.USER,
     };
 
     it('should register user successfully', async () => {
@@ -152,7 +153,7 @@ describe('Auth E2E Tests', () => {
       email: 'test@example.com',
       password: 'password123',
       name: 'Test User',
-      role: 'user',
+      role: Role.USER,
     };
 
     beforeEach(async () => {
@@ -257,7 +258,7 @@ describe('Auth E2E Tests', () => {
         email: 'test@example.com',
         password: 'password123',
         name: 'Test User',
-        role: 'user',
+        role: Role.USER,
       };
 
       await userRepository.create({
@@ -331,7 +332,7 @@ describe('Auth E2E Tests', () => {
         email: 'test@example.com',
         password: 'password123',
         name: 'Test User',
-        role: 'user',
+        role: Role.USER,
       };
 
       await userRepository.create({
@@ -392,7 +393,7 @@ describe('Auth E2E Tests', () => {
         email: 'test@example.com',
         password: 'password123',
         name: 'Test User',
-        role: 'user',
+        role: Role.USER,
       };
 
       const createdUser = await userRepository.create({
@@ -427,7 +428,7 @@ describe('Auth E2E Tests', () => {
             id: userId,
             email: 'test@example.com',
             name: 'Test User',
-            role: 'user',
+            role: Role.USER,
             createdAt: expect.any(String),
             updatedAt: expect.any(String),
           },

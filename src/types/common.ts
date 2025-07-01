@@ -28,10 +28,12 @@ export interface PaginatedResult<T> {
   };
 }
 
+import { Role } from '@/types/role.enum';
+
 export interface JwtPayload {
   userId: number;
   email: string;
-  role: string;
+  role: Role;
   iat?: number;
   exp?: number;
 }

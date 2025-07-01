@@ -5,6 +5,7 @@ import { UnauthorizedError } from '@/middleware/error-handler';
 import { config } from '@/config/environment';
 import jwt from 'jsonwebtoken';
 import { Response } from 'express';
+import { Role } from '@/types/role.enum';
 
 // Mock dependencies
 jest.mock('@/user/user.service');
@@ -21,7 +22,7 @@ describe('AuthService', () => {
     email: 'test@example.com',
     password: 'hashedPassword',
     name: 'Test User',
-    role: 'user',
+    role: Role.USER,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -30,7 +31,7 @@ describe('AuthService', () => {
     id: 1,
     email: 'test@example.com',
     name: 'Test User',
-    role: 'user',
+    role: Role.USER,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -120,7 +121,7 @@ describe('AuthService', () => {
       const mockPayload = {
         userId: 1,
         email: 'test@example.com',
-        role: 'user',
+        role: Role.USER,
       };
       (jwt.verify as jest.Mock).mockReturnValue(mockPayload);
       mockUserService.findById.mockResolvedValue(mockUserResponse);
@@ -140,7 +141,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedError when user not found', async () => {
       // Arrange
-      const mockPayload = { userId: 999, email: 'test@example.com', role: 'user' };
+      const mockPayload = { userId: 999, email: 'test@example.com', role: Role.USER };
       (jwt.verify as jest.Mock).mockReturnValue(mockPayload);
       mockUserService.findById.mockResolvedValue(null);
 

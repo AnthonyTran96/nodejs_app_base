@@ -4,6 +4,7 @@ import { DatabaseConnection } from '@/database/connection';
 import { Container } from '@/core/container';
 import { UserRepository } from '@/user/user.repository';
 import { HashUtil } from '@/utils/hash';
+import { Role } from '@/types/role.enum';
 
 describe('Users E2E Tests', () => {
   let app: Application;
@@ -32,14 +33,14 @@ describe('Users E2E Tests', () => {
       email: 'admin@example.com',
       password: await HashUtil.hash('password123'),
       name: 'Admin User',
-      role: 'admin',
+      role: Role.ADMIN,
     });
 
     const regularUser = await userRepository.create({
       email: 'user@example.com',
       password: await HashUtil.hash('password123'),
       name: 'Regular User',
-      role: 'user',
+      role: Role.USER,
     });
 
     testUserId = regularUser.id;

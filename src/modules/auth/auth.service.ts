@@ -6,6 +6,7 @@ import { config } from '@/config/environment';
 import { JwtPayload } from '@/types/common';
 import { UnauthorizedError } from '@/middleware/error-handler';
 import { Service } from '@/core/container';
+import { Role } from '@/types/role.enum';
 
 export interface AuthTokens {
   accessToken: string;
@@ -17,7 +18,7 @@ export interface LoginResponse {
     id: number;
     email: string;
     name: string;
-    role: string;
+    role: Role;
     createdAt: Date;
     updatedAt: Date;
   };
