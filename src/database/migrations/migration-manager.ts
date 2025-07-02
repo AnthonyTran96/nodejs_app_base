@@ -11,6 +11,15 @@ export class MigrationManager {
     this.dbConnection = DatabaseConnection.getInstance();
   }
 
+  // Helper method for database-specific placeholders
+  private createPlaceholder(index: number): string {
+    if (config.database.type === 'postgresql') {
+      return `$${index + 1}`;
+    } else {
+      return '?';
+    }
+  }
+
   registerMigration(migration: Migration): void {
     this.migrations.push(migration);
     // Sort by version to ensure proper execution order
@@ -19,11 +28,12 @@ export class MigrationManager {
 
   async initialize(): Promise<void> {
     // Create migrations table if it doesn't exist
+    // Both PostgreSQL and SQLite use same TIMESTAMP syntax
     const createMigrationsTable = `
       CREATE TABLE IF NOT EXISTS migrations (
         version VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
-        executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
@@ -110,11 +120,9 @@ export class MigrationManager {
         `Migration ${migration.version} timed out`
       );
 
-      // Record migration execution
-      await this.dbConnection.execute('INSERT INTO migrations (version, name) VALUES (?, ?)', [
-        migration.version,
-        migration.name,
-      ]);
+      // Record migration execution with database-agnostic placeholders
+      const insertSQL = `INSERT INTO migrations (version, name) VALUES (${this.createPlaceholder(0)}, ${this.createPlaceholder(1)})`;
+      await this.dbConnection.execute(insertSQL, [migration.version, migration.name]);
 
       await this.dbConnection.commit();
 
@@ -181,10 +189,9 @@ export class MigrationManager {
         `Rollback ${migration.version} timed out`
       );
 
-      // Remove migration record
-      await this.dbConnection.execute('DELETE FROM migrations WHERE version = ?', [
-        migration.version,
-      ]);
+      // Remove migration record with database-agnostic placeholder
+      const deleteSQL = `DELETE FROM migrations WHERE version = ${this.createPlaceholder(0)}`;
+      await this.dbConnection.execute(deleteSQL, [migration.version]);
 
       await this.dbConnection.commit();
 

@@ -31,8 +31,12 @@ src/
 │   ├── container-setup.ts # 🔧 Centralized dependency registration
 │   ├── base.repository.ts # Base repository pattern
 │   ├── unit-of-work.ts # Transaction management
+│   ├── module-registry.ts # Module registration system
 │   └── index.ts        # Route initialization
 ├── database/           # Database connection and migrations
+│   ├── connection.ts   # PostgreSQL/SQLite connection
+│   ├── migrations/     # Database schema migrations
+│   └── seeds/          # Sample data seeding
 ├── middleware/         # Express middleware (auth, validation, etc.)
 ├── types/              # TypeScript type definitions
 │   ├── role.enum.ts    # 🎭 Role enum and type definitions
@@ -43,19 +47,26 @@ src/
 │   ├── auth/           # Authentication module
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
-│   │   └── auth.routes.ts
+│   │   ├── auth.routes.ts
+│   │   └── auth.registry.ts # 🆕 Module self-registration
 │   └── user/           # User management module
 │       ├── user.controller.ts
 │       ├── user.service.ts
 │       ├── user.repository.ts
 │       ├── user.routes.ts
-│       └── user.dto.ts
+│       ├── user.dto.ts
+│       └── user.registry.ts # 🆕 Module self-registration
 └── models/             # Data models and interfaces
 
 tests/
 ├── unit/               # Unit tests
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
+
+docs/
+├── ONBOARDING.md           # 📖 This guide
+├── DATABASE_MIGRATION_GUIDE.md # Database management
+└── ENVIRONMENT_SETUP.md    # Environment configuration
 ```
 
 ## 🎭 Role System & Type Safety
@@ -147,21 +158,30 @@ npm install
 
 ### 2. Environment Setup
 
-Copy the environment template:
 ```bash
+# Copy environment template
 cp .env.example .env
+
+# Edit .env with your configuration
+# See docs/ENVIRONMENT_SETUP.md for detailed guide
 ```
 
-Edit `.env` with your configuration:
-- Database settings
-- JWT secrets
-- Other environment-specific values
+Basic `.env` configuration:
+```env
+NODE_ENV=development
+PORT=3000
+DB_TYPE=sqlite
+DB_SQLITE_PATH=./database.sqlite
+JWT_SECRET=your-development-jwt-secret-key-32-chars
+JWT_REFRESH_SECRET=your-development-refresh-secret-32-chars
+COOKIE_SECRET=your-development-cookie-secret-32-chars
+```
 
 ### 3. Database Setup
 
 The application will automatically create the SQLite database and run migrations on startup.
 
-For production, configure MySQL in your environment variables.
+For production, configure PostgreSQL in your environment variables.
 
 ### 4. Start Development Server
 
@@ -233,8 +253,6 @@ This project uses a **Module Registry Pattern** to eliminate merge conflicts whe
 3. `container-setup.ts` just imports the registry files
 4. **No more massive merge conflicts!** 🎉
 
-📚 **Detailed Guide**: See `docs/MODULE_REGISTRY_GUIDE.md`
-
 ## 🆕 Adding a New Feature Module
 
 Follow these steps to add a new feature (e.g., "Posts"):
@@ -248,6 +266,7 @@ touch src/modules/post/post.repository.ts
 touch src/modules/post/post.service.ts
 touch src/modules/post/post.controller.ts
 touch src/modules/post/post.routes.ts
+touch src/modules/post/post.registry.ts
 ```
 
 ### 2. Create the Model
@@ -286,7 +305,7 @@ export interface PostResponse {
 
 ```typescript
 // src/modules/post/post.dto.ts
-import { IsNotEmpty, IsString, IsInt, IsOptional, IsBoolean } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreatePostDto {
   @IsNotEmpty()
@@ -330,7 +349,7 @@ export class PostRepository extends BaseRepository<Post> {
   protected readonly tableName = 'posts';
 
   async findByAuthor(authorId: number): Promise<Post[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE authorId = ?`;
+    const sql = `SELECT * FROM ${this.tableName} WHERE authorId = ${this.createPlaceholder(0)}`;
     const result = await this.executeQuery<Post>(sql, [authorId]);
     return result.rows.map(row => this.transformDates(row));
   }
@@ -338,12 +357,6 @@ export class PostRepository extends BaseRepository<Post> {
   async findPublished(): Promise<Post[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE published = true`;
     const result = await this.executeQuery<Post>(sql);
-    return result.rows.map(row => this.transformDates(row));
-  }
-
-  async findByStatus(published: boolean): Promise<Post[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE published = ?`;
-    const result = await this.executeQuery<Post>(sql, [published]);
     return result.rows.map(row => this.transformDates(row));
   }
 }
@@ -357,7 +370,6 @@ import { PostRepository } from '@/modules/post/post.repository';
 import { UnitOfWork } from '@/core/unit-of-work';
 import { Post, CreatePostRequest, PostResponse } from '@/models/post.model';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
-import { ValidationError, NotFoundError } from '@/middleware/error-handler';
 import { Service } from '@/core/container';
 
 @Service('PostService')
@@ -383,29 +395,6 @@ export class PostService {
       data: result.data.map(post => this.toPostResponse(post)),
       meta: result.meta,
     };
-  }
-
-  async findById(id: number): Promise<PostResponse | null> {
-    const post = await this.postRepository.findById(id);
-    return post ? this.toPostResponse(post) : null;
-  }
-
-  async update(id: number, updateData: Partial<CreatePostRequest>): Promise<PostResponse | null> {
-    return this.unitOfWork.executeInTransaction(async () => {
-      const post = await this.postRepository.update(id, updateData);
-      return post ? this.toPostResponse(post) : null;
-    });
-  }
-
-  async delete(id: number): Promise<boolean> {
-    return this.unitOfWork.executeInTransaction(async () => {
-      return this.postRepository.delete(id);
-    });
-  }
-
-  async findByAuthor(authorId: number): Promise<PostResponse[]> {
-    const posts = await this.postRepository.findByAuthor(authorId);
-    return posts.map(post => this.toPostResponse(post));
   }
 
   private toPostResponse(post: Post): PostResponse {
@@ -462,54 +451,6 @@ export class PostController {
       next(error);
     }
   }
-
-  async getPostById(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const post = await this.postService.findById(Number(id));
-
-      if (!post) {
-        ResponseUtil.notFound(res, 'Post not found');
-        return;
-      }
-
-      ResponseUtil.success(res, { post }, 'Post retrieved successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async updatePost(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const post = await this.postService.update(Number(id), req.body);
-
-      if (!post) {
-        ResponseUtil.notFound(res, 'Post not found');
-        return;
-      }
-
-      ResponseUtil.success(res, { post }, 'Post updated successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async deletePost(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const { id } = req.params;
-      const deleted = await this.postService.delete(Number(id));
-
-      if (!deleted) {
-        ResponseUtil.notFound(res, 'Post not found');
-        return;
-      }
-
-      ResponseUtil.success(res, null, 'Post deleted successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 ```
 
@@ -537,23 +478,10 @@ export function createPostRoutes(postController: PostController): Router {
     postController.getPosts.bind(postController)
   );
 
-  router.get(
-    '/:id',
-    ValidateParams(IdParamDto),
-    postController.getPostById.bind(postController)
-  );
-
   router.post(
     '/',
     ValidateBody(CreatePostDto),
     postController.createPost.bind(postController)
-  );
-
-  router.put(
-    '/:id',
-    ValidateParams(IdParamDto),
-    ValidateBody(UpdatePostDto),
-    postController.updatePost.bind(postController)
   );
 
   router.delete(
@@ -567,10 +495,10 @@ export function createPostRoutes(postController: PostController): Router {
 }
 ```
 
-### 8. Create Module Registry
+### 8. Create Module Registry (🆕 Key Step!)
 
 ```typescript
-// src/modules/post/post.registry.ts - Create this new file
+// src/modules/post/post.registry.ts
 import { Container } from '@/core/container';
 import { ModuleRegistry } from '@/core/module-registry';
 
@@ -591,12 +519,12 @@ ModuleRegistry.registerModule({
 
     container.register('PostController', PostController, {
       dependencies: ['PostService'],
-  });
+    });
   },
 });
 ```
 
-### 9. Add to Container Setup
+### 9. Add to Container Setup (Only 1 line!)
 
 ```typescript
 // src/core/container-setup.ts - Just add ONE line!
@@ -627,167 +555,45 @@ export function initializeRoutes(): void {
 }
 ```
 
-### 11. Database Migration
+## 🗄️ Database Management
 
-```typescript
-// src/database/connection.ts - Add to runMigrations method
-private async runMigrations(): Promise<void> {
-  // ... existing migrations ...
+### Database Support
+- **Development**: SQLite (automatic setup)
+- **Production**: PostgreSQL (recommended)
 
-  // Add posts table
-  const createPostsTable = `
-    CREATE TABLE IF NOT EXISTS posts (
-      id INTEGER PRIMARY KEY ${this.dbType === 'mysql' ? 'AUTO_INCREMENT' : 'AUTOINCREMENT'},
-      title VARCHAR(255) NOT NULL,
-      content TEXT NOT NULL,
-      authorId INTEGER NOT NULL,
-      published BOOLEAN DEFAULT FALSE,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (authorId) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `;
-  await this.execute(createPostsTable);
-}
+### Migration System
+```bash
+# Run migrations (automatically on startup)
+npm run db:migrate
+
+# Check migration status
+npm run db:migrate:status
+
+# Rollback last migration
+npm run db:migrate:rollback
 ```
+
+See `docs/DATABASE_MIGRATION_GUIDE.md` for detailed database management.
 
 ## 🧪 Testing Strategy
 
 ### Unit Tests
-
-Test services in isolation with mocked dependencies:
-
-```typescript
-// tests/unit/modules/post/post.service.test.ts
-import { PostService } from '@/modules/post/post.service';
-import { PostRepository } from '@/modules/post/post.repository';
-import { UnitOfWork } from '@/core/unit-of-work';
-
-jest.mock('@/modules/post/post.repository');
-jest.mock('@/core/unit-of-work');
-
-describe('PostService', () => {
-  let postService: PostService;
-  let mockPostRepository: jest.Mocked<PostRepository>;
-  let mockUnitOfWork: jest.Mocked<UnitOfWork>;
-
-  beforeEach(() => {
-    mockPostRepository = {
-      create: jest.fn(),
-      findAll: jest.fn(),
-      findById: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      findByAuthor: jest.fn(),
-    } as any;
-
-    mockUnitOfWork = {
-      executeInTransaction: jest.fn().mockImplementation(callback => callback()),
-    } as any;
-
-    postService = new PostService(mockPostRepository, mockUnitOfWork);
-  });
-
-  it('should create a post successfully', async () => {
-    // Arrange
-    const postData = { title: 'Test Post', content: 'Test Content', authorId: 1 };
-    const createdPost = { id: 1, ...postData, published: false, createdAt: new Date(), updatedAt: new Date() };
-    
-    mockPostRepository.create.mockResolvedValue(createdPost);
-
-    // Act
-    const result = await postService.create(postData);
-
-    // Assert
-    expect(mockPostRepository.create).toHaveBeenCalledWith({
-      ...postData,
-      published: false,
-    });
-    expect(result.title).toBe(postData.title);
-  });
-});
-```
+Test services in isolation with mocked dependencies.
 
 ### Integration Tests
-
-Test repository interactions with the database:
-
-```typescript
-// tests/integration/modules/post/post.repository.test.ts
-import { PostRepository } from '@/modules/post/post.repository';
-import { DatabaseConnection } from '@/database/connection';
-
-describe('PostRepository Integration', () => {
-  let postRepository: PostRepository;
-  let dbConnection: DatabaseConnection;
-
-  beforeAll(async () => {
-    dbConnection = DatabaseConnection.getInstance();
-    await dbConnection.initialize();
-    postRepository = new PostRepository();
-  });
-
-  beforeEach(async () => {
-    await dbConnection.execute('DELETE FROM posts');
-  });
-
-  afterAll(async () => {
-    await dbConnection.close();
-  });
-
-  it('should create and retrieve posts', async () => {
-    // Arrange
-    const postData = { title: 'Integration Test', content: 'Test Content', authorId: 1, published: true };
-
-    // Act
-    const createdPost = await postRepository.create(postData);
-    const foundPost = await postRepository.findById(createdPost.id);
-
-    // Assert
-    expect(foundPost).toBeTruthy();
-    expect(foundPost?.title).toBe(postData.title);
-    expect(foundPost?.published).toBe(true);
-  });
-});
-```
+Test repository interactions with the database.
 
 ### E2E Tests
+Test complete API workflows.
 
-Test complete API workflows:
+```bash
+# Run all tests
+npm test
 
-```typescript
-// tests/e2e/posts.e2e.test.ts
-import request from 'supertest';
-import { Application } from '@/app';
-import { DatabaseConnection } from '@/database/connection';
-
-describe('Posts E2E Tests', () => {
-  let app: Application;
-  let accessToken: string;
-
-  beforeAll(async () => {
-    app = new Application();
-    await app.initialize();
-    
-    // Login to get access token
-    const loginResponse = await request(app.getApp())
-      .post('/api/v1/auth/login')
-      .send({ email: 'test@example.com', password: 'password123' });
-    
-    accessToken = loginResponse.body.data.tokens.accessToken;
-  });
-
-  it('should create a post successfully', async () => {
-    const response = await request(app.getApp())
-      .post('/api/v1/posts')
-      .set('Cookie', `accessToken=${accessToken}`)
-      .send({ title: 'E2E Test Post', content: 'Test Content' })
-      .expect(201);
-
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.title).toBe('E2E Test Post');
-  });
-});
+# Run specific test types
+npm run test:unit
+npm run test:integration
+npm run test:e2e
 ```
 
 ## 🛡️ Authentication & Authorization
@@ -834,24 +640,8 @@ async createPost(req: AuthenticatedRequest, res: Response): Promise<void> {
 Use class-validator decorators with enum validation:
 
 ```typescript
-import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsBoolean, IsEnum, IsString, Length } from 'class-validator';
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsBoolean, IsEnum } from 'class-validator';
 import { Role, getRoleValues } from '@/types/role.enum';
-
-export class CreatePostDto {
-  @IsNotEmpty()
-  @IsString()
-  @Length(5, 255)
-  title!: string;
-
-  @IsNotEmpty()
-  @IsString()
-  @MinLength(10)
-  content!: string;
-
-  @IsOptional()
-  @IsBoolean()
-  published?: boolean;
-}
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -889,8 +679,6 @@ ResponseUtil.successWithPagination(res, paginatedResult);
 // Error responses
 ResponseUtil.error(res, 'Error message', 400);
 ResponseUtil.notFound(res, 'Resource not found');
-ResponseUtil.unauthorized(res);
-ResponseUtil.forbidden(res, 'Access denied');
 ```
 
 ### Logging
@@ -903,18 +691,6 @@ import { logger } from '@/utils/logger';
 logger.info('Operation completed', { userId, postId });
 logger.error('Failed to create post:', error);
 logger.debug('Debug information', { data });
-logger.warn('Warning message');
-```
-
-### Container Access
-
-Access services from the container when needed:
-
-```typescript
-import { Container } from '@/core/container';
-
-const container = Container.getInstance();
-const postService = container.get<PostService>('PostService');
 ```
 
 ## 🔒 Security Best Practices
@@ -925,10 +701,7 @@ const postService = container.get<PostService>('PostService');
 4. **Implement proper authentication** with JWT tokens
 5. **Use role-based authorization** with enum-based guards for type safety
 6. **Validate roles** using `Role` enum and `isValidRole()` helper function
-7. **Sanitize data** before database operations
-8. **Use HTTPS in production**
-9. **Keep dependencies updated**
-10. **Log security events** appropriately
+7. **Use proper environment configuration** (see `docs/ENVIRONMENT_SETUP.md`)
 
 ### Role Security Guidelines
 
@@ -949,29 +722,15 @@ if (isValidRole(inputRole)) {
 if (user.role === 'admin') { // No type safety
   // Admin logic
 }
-
-// ✅ Good: Enum-based authorization
-router.delete('/:id', authorize([Role.ADMIN]));
-
-// ❌ Bad: String-based authorization  
-router.delete('/:id', authorize(['admin'])); // No compile-time checking
 ```
 
 ## 📊 Environment Configuration
 
-### Development
-- Uses SQLite database
-- Detailed logging (debug level)
-- CORS enabled for all origins
-- Hot reloading with nodemon
-- Path aliases via tsconfig-paths
+- **Development**: SQLite, debug logging, auto-migrations
+- **Test**: SQLite, error-only logging, auto-migrations
+- **Production**: PostgreSQL, warn logging, manual migrations
 
-### Production
-- Uses MySQL database
-- Error-only logging
-- Restricted CORS
-- Security headers enabled
-- Optimized builds with tsc-alias
+See `docs/ENVIRONMENT_SETUP.md` for complete configuration guide.
 
 ## 🚦 API Conventions
 
@@ -979,7 +738,6 @@ router.delete('/:id', authorize(['admin'])); // No compile-time checking
 - Use RESTful conventions
 - Prefix with `/api/v1`
 - Use plural nouns for resources (`/users`, `/posts`)
-- Use kebab-case for multi-word resources
 
 ### Response Format
 All responses follow this structure:
@@ -1013,15 +771,6 @@ All responses follow this structure:
 }
 ```
 
-### Status Codes
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request / Validation Error
-- `401` - Unauthorized
-- `403` - Forbidden
-- `404` - Not Found
-- `500` - Internal Server Error
-
 ## 🐛 Debugging
 
 ### Local Development
@@ -1047,51 +796,26 @@ console.log('PostService registered:', isRegistered);
 sqlite3 database.sqlite
 .tables
 SELECT * FROM posts;
-```
 
-### Testing Database Queries
-```typescript
-// Add debug logging to repositories
-async findByAuthor(authorId: number): Promise<Post[]> {
-  const sql = `SELECT * FROM ${this.tableName} WHERE authorId = ?`;
-  console.log('SQL:', sql, 'Params:', [authorId]); // Debug
-  const result = await this.executeQuery<Post>(sql, [authorId]);
-  return result.rows.map(row => this.transformDates(row));
-}
-```
-
-### Role-Related Debugging
-
-```typescript
-import { Role, isValidRole, getRoleValues } from '@/types/role.enum';
-
-// Debug role validation
-console.log('Available roles:', getRoleValues());
-console.log('Is valid role:', isValidRole('admin')); // true
-console.log('Is valid role:', isValidRole('invalid')); // false
-
-// Debug user role in controllers
-async someController(req: AuthenticatedRequest, res: Response): Promise<void> {
-  console.log('User role:', req.user?.role);
-  console.log('Is admin:', req.user?.role === Role.ADMIN);
-  console.log('Role type:', typeof req.user?.role);
-}
-
-// Debug enum compilation
-console.log('Role enum values:', Object.values(Role));
-console.log('Role.ADMIN value:', Role.ADMIN); // 'admin'
-console.log('Role.USER value:', Role.USER);   // 'user'
+# PostgreSQL
+psql -h localhost -U username -d database
+\dt
+SELECT * FROM posts;
 ```
 
 ## 📚 Additional Resources
 
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
-- [TypeScript Enums](https://www.typescriptlang.org/docs/handbook/enums.html) - Learn more about enum usage and best practices
+- [TypeScript Enums](https://www.typescriptlang.org/docs/handbook/enums.html)
 - [Express.js Guide](https://expressjs.com/en/guide/)
 - [Class Validator Documentation](https://github.com/typestack/class-validator)
-- [Class Validator Enum Validation](https://github.com/typestack/class-validator#validation-decorators) - Using @IsEnum decorator
 - [Jest Testing Framework](https://jestjs.io/docs/getting-started)
-- [Supertest for API Testing](https://github.com/ladjs/supertest)
+
+## 📖 Project Documentation
+
+- **Environment Setup**: `docs/ENVIRONMENT_SETUP.md`
+- **Database Management**: `docs/DATABASE_MIGRATION_GUIDE.md`
+- **This Guide**: `docs/ONBOARDING.md`
 
 ---
 

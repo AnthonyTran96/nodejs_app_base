@@ -21,6 +21,9 @@ export async function runMigrations(): Promise<void> {
   // CLI migrations are manual migrations, so force manual = true
   await migrationManager.runPendingMigrations(true);
   await dbConnection.close();
+  
+  // Give a short time for cleanup before forcing exit
+  await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 export async function rollbackMigration(): Promise<void> {
@@ -32,6 +35,9 @@ export async function rollbackMigration(): Promise<void> {
 
   await migrationManager.rollbackLastMigration();
   await dbConnection.close();
+  
+  // Give a short time for cleanup before forcing exit
+  await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 export async function migrationStatus(): Promise<void> {
@@ -43,6 +49,9 @@ export async function migrationStatus(): Promise<void> {
 
   await migrationManager.getMigrationStatus();
   await dbConnection.close();
+  
+  // Give a short time for cleanup before forcing exit
+  await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 // CLI Support - check command line arguments
@@ -54,10 +63,12 @@ async function main(): Promise<void> {
       case 'up':
       case 'migrate':
         await runMigrations();
+        logger.info('✅ Migration completed successfully');
         break;
       case 'down':
       case 'rollback':
         await rollbackMigration();
+        logger.info('✅ Rollback completed successfully');
         break;
       case 'status':
         await migrationStatus();
@@ -71,8 +82,11 @@ async function main(): Promise<void> {
         logger.info('  down, rollback  - Rollback last migration');
         logger.info('  status          - Show migration status');
         logger.info('');
-        break;
+        process.exit(0);
     }
+    
+    // Force exit after successful operations
+    process.exit(0);
   } catch (error) {
     logger.error('Migration command failed:', error);
     process.exit(1);

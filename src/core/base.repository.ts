@@ -1,6 +1,7 @@
 import { DatabaseConnection } from '@/database/connection';
 import { QueryResult } from '@/types/database';
 import { PaginationOptions, PaginatedResult } from '@/types/common';
+import { config } from '@/config/environment';
 
 export abstract class BaseRepository<T> {
   protected readonly db: DatabaseConnection;
@@ -10,8 +11,25 @@ export abstract class BaseRepository<T> {
     this.db = DatabaseConnection.getInstance();
   }
 
+  // Helper methods for database-specific syntax
+  protected createPlaceholder(index: number): string {
+    if (config.database.type === 'postgresql') {
+      return `$${index + 1}`;
+    } else {
+      return '?';
+    }
+  }
+
+  private createPlaceholders(count: number): string {
+    const placeholders = [];
+    for (let i = 0; i < count; i++) {
+      placeholders.push(this.createPlaceholder(i));
+    }
+    return placeholders.join(', ');
+  }
+
   async findById(id: number): Promise<T | null> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE id = ? LIMIT 1`;
+    const sql = `SELECT * FROM ${this.tableName} WHERE id = ${this.createPlaceholder(0)} LIMIT 1`;
     const result = await this.db.query<T>(sql, [id]);
     const row = result.rows[0];
     return row ? this.transformDates(row) : null;
@@ -31,10 +49,13 @@ export abstract class BaseRepository<T> {
     const countResult = await this.db.query<{ total: number }>(countSql);
     const total = countResult.rows[0]?.total || 0;
 
-    // Apply pagination
+    // Apply pagination - both PostgreSQL and SQLite support LIMIT/OFFSET
     if (options?.limit && options?.page) {
       const offset = (options.page - 1) * options.limit;
-      sql += ` LIMIT ? OFFSET ?`;
+      const limitPlaceholder = this.createPlaceholder(params.length);
+      const offsetPlaceholder = this.createPlaceholder(params.length + 1);
+
+      sql += ` LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
       params.push(options.limit, offset);
     }
 
@@ -54,30 +75,55 @@ export abstract class BaseRepository<T> {
   async create(data: Partial<T>): Promise<T> {
     const fields = Object.keys(data).filter(key => data[key as keyof T] !== undefined);
     const values = fields.map(key => data[key as keyof T]);
-    const placeholders = fields.map(() => '?').join(', ');
 
-    const sql = `
-      INSERT INTO ${this.tableName} (${fields.join(', ')})
-      VALUES (${placeholders})
-    `;
+    if (config.database.type === 'postgresql') {
+      // PostgreSQL: Use $1, $2, $3 placeholders and RETURNING clause
+      const placeholders = this.createPlaceholders(fields.length);
+      const sql = `
+        INSERT INTO ${this.tableName} (${fields.join(', ')})
+        VALUES (${placeholders})
+        RETURNING id
+      `;
 
-    await this.db.execute(sql, values);
+      const result = await this.db.query<{ id: number }>(sql, values);
+      const id = result.rows[0]?.id;
 
-    // Get the created record (assuming auto-increment ID)
-    const lastIdSql = this.getLastInsertIdSql();
-    const lastIdResult = await this.db.query<{ id: number }>(lastIdSql);
-    const id = lastIdResult.rows[0]?.id;
+      if (!id) {
+        throw new Error('Failed to get created record ID');
+      }
 
-    if (!id) {
-      throw new Error('Failed to get created record ID');
+      const created = await this.findById(id);
+      if (!created) {
+        throw new Error('Failed to retrieve created record');
+      }
+
+      return created;
+    } else {
+      // SQLite: Use ? placeholders and separate query for last insert ID
+      const placeholders = this.createPlaceholders(fields.length);
+      const sql = `
+        INSERT INTO ${this.tableName} (${fields.join(', ')})
+        VALUES (${placeholders})
+      `;
+
+      await this.db.execute(sql, values);
+
+      // Get the created record (assuming auto-increment ID)
+      const lastIdSql = this.getLastInsertIdSql();
+      const lastIdResult = await this.db.query<{ id: number }>(lastIdSql);
+      const id = lastIdResult.rows[0]?.id;
+
+      if (!id) {
+        throw new Error('Failed to get created record ID');
+      }
+
+      const created = await this.findById(id);
+      if (!created) {
+        throw new Error('Failed to retrieve created record');
+      }
+
+      return created;
     }
-
-    const created = await this.findById(id);
-    if (!created) {
-      throw new Error('Failed to retrieve created record');
-    }
-
-    return created;
   }
 
   async update(id: number, data: Partial<T>): Promise<T | null> {
@@ -86,13 +132,15 @@ export abstract class BaseRepository<T> {
       throw new Error('No data provided for update');
     }
 
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
+    const setClause = fields
+      .map((field, index) => `${field} = ${this.createPlaceholder(index)}`)
+      .join(', ');
     const values = fields.map(key => data[key as keyof T]);
 
     const sql = `
       UPDATE ${this.tableName}
       SET ${setClause}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ${this.createPlaceholder(fields.length)}
     `;
 
     await this.db.execute(sql, [...values, id]);
@@ -100,7 +148,7 @@ export abstract class BaseRepository<T> {
   }
 
   async delete(id: number): Promise<boolean> {
-    const sql = `DELETE FROM ${this.tableName} WHERE id = ?`;
+    const sql = `DELETE FROM ${this.tableName} WHERE id = ${this.createPlaceholder(0)}`;
     await this.db.execute(sql, [id]);
 
     // Check if the record was actually deleted
@@ -109,7 +157,7 @@ export abstract class BaseRepository<T> {
   }
 
   async exists(id: number): Promise<boolean> {
-    const sql = `SELECT 1 FROM ${this.tableName} WHERE id = ? LIMIT 1`;
+    const sql = `SELECT 1 FROM ${this.tableName} WHERE id = ${this.createPlaceholder(0)} LIMIT 1`;
     const result = await this.db.query(sql, [id]);
     return result.rows.length > 0;
   }
@@ -136,6 +184,10 @@ export abstract class BaseRepository<T> {
 
   private getLastInsertIdSql(): string {
     // This varies by database type
-    return 'SELECT last_insert_rowid() as id'; // SQLite
+    if (config.database.type === 'postgresql') {
+      return `SELECT lastval() as id`; // PostgreSQL
+    } else {
+      return 'SELECT last_insert_rowid() as id'; // SQLite
+    }
   }
 }
