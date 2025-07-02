@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project uses a custom migration and seeding system to manage database schema changes and sample data. This approach follows industry best practices for database version control.
+This project uses a custom migration and seeding system to manage database schema changes and sample data. This approach follows industry best practices for database version control and supports both SQLite (development) and PostgreSQL (production).
 
 ## 🚀 Migration System
 
@@ -13,21 +13,23 @@ This project uses a custom migration and seeding system to manage database schem
 - **Version Control**: Each migration has a unique version number
 - **Transaction Safety**: All migrations run in transactions
 - **Rollback Support**: Every migration must implement rollback logic
+- **Database Agnostic**: Supports both SQLite and PostgreSQL
 
 ### Directory Structure
 
 ```
 src/database/
+├── connection.ts                   # Database connection management
 ├── migrations/
 │   ├── migration.interface.ts      # Migration interface definition
 │   ├── migration-manager.ts        # Core migration engine
 │   ├── migration.template.ts       # Template for new migrations
-│   ├── 001_create_users_table.ts   # Example migration
+│   ├── 001_create_users_table.ts   # User table migration
 │   └── index.ts                    # Migration registry & CLI
 └── seeds/
     ├── seed.interface.ts           # Seed interface definition
     ├── seed-manager.ts             # Core seeding engine
-    ├── create-sample-user.ts       # Example seed
+    ├── create-sample-user.ts       # User seed data
     └── index.ts                    # Seed registry & CLI
 ```
 
@@ -42,29 +44,48 @@ cp src/database/migrations/migration.template.ts src/database/migrations/002_add
 ### 2. Update Migration
 
 ```typescript
+// src/database/migrations/002_add_posts_table.ts
 export class AddPostsTableMigration implements Migration {
   readonly version = '002';  // Sequential version number
   readonly name = 'add_posts_table';
 
   async up(): Promise<void> {
-    const isMySQL = config.database.type === 'mysql';
+    const isPostgreSQL = config.database.type === 'postgresql';
     
     const createPostsTable = `
       CREATE TABLE IF NOT EXISTS posts (
-        id INTEGER PRIMARY KEY ${isMySQL ? 'AUTO_INCREMENT' : 'AUTOINCREMENT'},
+        id ${isPostgreSQL ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
         title VARCHAR(255) NOT NULL,
         content TEXT,
         user_id INTEGER NOT NULL,
-        created_at ${isMySQL ? 'TIMESTAMP' : 'DATETIME'} DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        published BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `;
 
     await this.dbConnection.execute(createPostsTable);
     await this.dbConnection.execute('CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)');
+    
+    // PostgreSQL trigger for updated_at
+    if (isPostgreSQL) {
+      await this.dbConnection.execute(`
+        CREATE TRIGGER update_posts_updated_at
+        BEFORE UPDATE ON posts
+        FOR EACH ROW
+        EXECUTE FUNCTION update_updated_at_column();
+      `);
+    }
   }
 
   async down(): Promise<void> {
+    const isPostgreSQL = config.database.type === 'postgresql';
+    
+    if (isPostgreSQL) {
+      await this.dbConnection.execute('DROP TRIGGER IF EXISTS update_posts_updated_at ON posts');
+    }
+    
     await this.dbConnection.execute('DROP INDEX IF EXISTS idx_posts_user_id');
     await this.dbConnection.execute('DROP TABLE IF EXISTS posts');
   }
@@ -93,6 +114,7 @@ export function registerMigrations(migrationManager: MigrationManager): void {
 import { DatabaseConnection } from '@/database/connection';
 import { Seed } from './seed.interface';
 import { logger } from '@/utils/logger';
+import { config } from '@/config/environment';
 
 export class CreateSamplePostsSeed implements Seed {
   readonly name = 'create_sample_posts';
@@ -102,6 +124,15 @@ export class CreateSamplePostsSeed implements Seed {
 
   constructor() {
     this.dbConnection = DatabaseConnection.getInstance();
+  }
+
+  // Helper method for database-agnostic placeholders
+  private createPlaceholder(index: number): string {
+    if (config.database.type === 'postgresql') {
+      return `$${index + 1}`;
+    } else {
+      return '?';
+    }
   }
 
   async run(): Promise<void> {
@@ -116,10 +147,14 @@ export class CreateSamplePostsSeed implements Seed {
     }
 
     // Create sample posts
-    await this.dbConnection.execute(
-      'INSERT INTO posts (title, content, user_id) VALUES (?, ?, ?)',
-      ['First Post', 'This is the first post content', 1]
-    );
+    const insertSQL = `INSERT INTO posts (title, content, user_id, published) VALUES (${this.createPlaceholder(0)}, ${this.createPlaceholder(1)}, ${this.createPlaceholder(2)}, ${this.createPlaceholder(3)})`;
+    
+    await this.dbConnection.execute(insertSQL, [
+      'First Post',
+      'This is the first post content',
+      1,
+      true
+    ]);
 
     logger.info('✅ Sample posts created');
   }
@@ -145,48 +180,60 @@ export function registerSeeds(seedManager: SeedManager): void {
 
 ```bash
 # Run all pending migrations
-yarn db:migrate migrate
+npm run db:migrate
 
 # Check migration status
-yarn db:migrate:status
+npm run db:migrate:status
 
 # Rollback last migration
-yarn db:migrate:rollback
+npm run db:migrate:rollback
 
 # Show migration help
-yarn db:migrate
+npm run db:migrate --help
 ```
 
 ### Seed Commands
 
 ```bash
 # Run all seeds
-yarn db:seed
+npm run db:seed
 
 # List available seeds
-yarn db:seed:list
+npm run db:seed:list
 
 # Run specific seed
-yarn db:seed seed create_sample_users
+npm run db:seed run create_sample_users
 
 # Show seed help
-yarn db:seed
+npm run db:seed --help
 ```
 
 ## 🔄 Automatic Migrations
 
-Migrations run automatically when the application starts:
+Migrations run automatically when the application starts (configurable via environment):
 
 ```typescript
 // In src/app.ts
 private async setupDatabase(): Promise<void> {
-  // ... database connection ...
+  const dbConnection = DatabaseConnection.getInstance();
+  await dbConnection.initialize();
   
-  // Auto-run migrations on startup
-  const migrationManager = new MigrationManager();
-  registerMigrations(migrationManager);
-  await migrationManager.runPendingMigrations();
+  // Auto-run migrations based on environment configuration
+  if (config.autoRunMigrations) {
+    const migrationManager = new MigrationManager();
+    registerMigrations(migrationManager);
+    await migrationManager.runPendingMigrations();
+  }
 }
+```
+
+Environment control:
+```env
+# Development - auto-run enabled
+AUTO_RUN_MIGRATIONS=true
+
+# Production - manual control
+AUTO_RUN_MIGRATIONS=false
 ```
 
 ## 📋 Best Practices
@@ -196,7 +243,7 @@ private async setupDatabase(): Promise<void> {
 1. **Sequential Versioning**: Use incremental version numbers (001, 002, 003...)
 2. **Descriptive Names**: Use clear, descriptive migration names
 3. **Idempotent Operations**: Use `IF NOT EXISTS` and `IF EXISTS`
-4. **Database Compatibility**: Handle MySQL/SQLite differences
+4. **Database Compatibility**: Handle PostgreSQL/SQLite differences properly
 5. **Complete Rollback**: Always implement proper `down()` methods
 6. **Atomic Changes**: Keep migrations focused on single concerns
 7. **Never Modify**: Don't change existing migrations in production
@@ -209,35 +256,66 @@ private async setupDatabase(): Promise<void> {
 4. **Real-like Data**: Use realistic sample data
 5. **Performance**: Don't seed large datasets in production
 
+### Database-Agnostic Code
+
+```typescript
+// ✅ Good: Database-agnostic placeholders
+private createPlaceholder(index: number): string {
+  return config.database.type === 'postgresql' ? `$${index + 1}` : '?';
+}
+
+// ✅ Good: Database-specific features
+const autoIncrement = config.database.type === 'postgresql' ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+
+// ✅ Good: Conditional triggers
+if (config.database.type === 'postgresql') {
+  await this.dbConnection.execute(`
+    CREATE TRIGGER update_table_updated_at
+    BEFORE UPDATE ON table_name
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+  `);
+}
+```
+
 ## 🗄️ Database Support
 
-The system supports both SQLite and MySQL:
+The system supports both SQLite and PostgreSQL with automatic detection:
 
 ### SQLite (Development)
-- Auto-increment: `AUTOINCREMENT`
-- DateTime: `DATETIME`
-- File-based: `./database.sqlite`
+- **Auto-increment**: `AUTOINCREMENT`
+- **DateTime**: `TIMESTAMP`
+- **File-based**: `./database.sqlite`
+- **Parameter placeholders**: `?`
 
-### MySQL (Production)
-- Auto-increment: `AUTO_INCREMENT`
-- DateTime: `TIMESTAMP`
-- Server-based: Configure via environment
+### PostgreSQL (Production)
+- **Auto-increment**: `SERIAL`
+- **DateTime**: `TIMESTAMP`
+- **Server-based**: Configure via environment
+- **Parameter placeholders**: `$1, $2, $3`
+- **Triggers**: Required for `updated_at` automation
 
 ## 🔧 Environment Configuration
 
 ```env
 # Database Type
-DB_TYPE=sqlite                    # or mysql
+DB_TYPE=sqlite                    # or postgresql
 
-# SQLite
+# SQLite Configuration
 DB_SQLITE_PATH=./database.sqlite
 
-# MySQL
+# PostgreSQL Configuration
 DB_HOST=localhost
-DB_PORT=3306
-DB_USERNAME=root
+DB_PORT=5432
+DB_USERNAME=postgres
 DB_PASSWORD=password
 DB_DATABASE=nodejs_backend
+
+# Migration Control
+AUTO_RUN_MIGRATIONS=true          # Auto-run in dev/test
+REQUIRE_MIGRATION_APPROVAL=false  # Manual approval in production
+ALLOW_DATA_LOSS_MIGRATIONS=true   # Allow destructive operations
+MIGRATION_TIMEOUT_MS=300000       # 5 minutes timeout
 ```
 
 ## 🚨 Troubleshooting
@@ -246,20 +324,36 @@ DB_DATABASE=nodejs_backend
 
 1. **Migration Already Exists**: Check version numbers are unique
 2. **Rollback Failed**: Ensure `down()` method is properly implemented
-3. **Type Errors**: Import database types correctly
-4. **Connection Issues**: Check database configuration
+3. **Parameter Placeholder Errors**: Use `createPlaceholder()` helper method
+4. **Connection Issues**: Check database configuration and server status
 
 ### Debug Commands
 
 ```bash
 # Check current migration status
-yarn db:migrate:status
+npm run db:migrate:status
 
-# Test rollback (be careful!)
-yarn db:migrate:rollback
+# Test rollback (be careful in production!)
+npm run db:migrate:rollback
 
 # Re-run failed migration
-yarn db:migrate migrate
+npm run db:migrate
+```
+
+### Database-Specific Debugging
+
+```bash
+# SQLite
+sqlite3 database.sqlite
+.tables
+.schema users
+SELECT * FROM migrations;
+
+# PostgreSQL
+psql -h localhost -U username -d database
+\dt
+\d users
+SELECT * FROM migrations;
 ```
 
 ## 📚 Examples
@@ -276,8 +370,12 @@ async up(): Promise<void> {
 
 async down(): Promise<void> {
   // Note: SQLite doesn't support DROP COLUMN easily
-  // Consider creating new table and copying data
-  throw new Error('Cannot rollback: SQLite does not support DROP COLUMN');
+  // Consider backup/restore approach for SQLite
+  if (config.database.type === 'postgresql') {
+    await this.dbConnection.execute('ALTER TABLE users DROP COLUMN email_verified');
+  } else {
+    throw new Error('Cannot rollback: SQLite does not support DROP COLUMN');
+  }
 }
 ```
 
@@ -295,6 +393,21 @@ async down(): Promise<void> {
   await this.dbConnection.execute(
     'DROP INDEX IF EXISTS idx_users_email_unique'
   );
+}
+```
+
+### Data Migration with Parameters
+
+```typescript
+// 005_update_user_roles.ts
+async up(): Promise<void> {
+  const updateSQL = `UPDATE users SET role = ${this.createPlaceholder(0)} WHERE role IS NULL`;
+  await this.dbConnection.execute(updateSQL, ['user']);
+}
+
+async down(): Promise<void> {
+  const updateSQL = `UPDATE users SET role = NULL WHERE role = ${this.createPlaceholder(0)}`;
+  await this.dbConnection.execute(updateSQL, ['user']);
 }
 ```
 
@@ -325,11 +438,19 @@ export class CreateUsersTableMigration implements Migration {
 
 ## 🏆 Benefits
 
-1. **Version Control**: Track all database changes
-2. **Team Collaboration**: Share schema changes via code
+1. **Version Control**: Track all database changes in code
+2. **Team Collaboration**: Share schema changes via migrations
 3. **Environment Consistency**: Same schema across dev/staging/prod
 4. **Rollback Capability**: Safely undo changes if needed
-5. **Automated Deployment**: Migrations run automatically
+5. **Automated Deployment**: Migrations run automatically (configurable)
 6. **Audit Trail**: See what changed and when
+7. **Database Agnostic**: Works with both SQLite and PostgreSQL
+
+## 🔗 Related Documentation
+
+- **Environment Setup**: `docs/ENVIRONMENT_SETUP.md` - Database configuration
+- **Onboarding Guide**: `docs/ONBOARDING.md` - Getting started with development
+
+---
 
 This migration system ensures your database schema is properly versioned, tracked, and can be safely deployed across different environments! 🚀 

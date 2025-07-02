@@ -13,15 +13,15 @@ export class TemplateMigration implements Migration {
   }
 
   async up(): Promise<void> {
-    const isMySQL = config.database.type === 'mysql';
+    const isPostgreSQL = config.database.type === 'postgresql';
 
     // Write your migration logic here
     // Example: Create table
     const createTableSQL = `
       CREATE TABLE IF NOT EXISTS example_table (
-        id INTEGER PRIMARY KEY ${isMySQL ? 'AUTO_INCREMENT' : 'AUTOINCREMENT'},
+        id ${isPostgreSQL ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT'},
         name VARCHAR(255) NOT NULL,
-        created_at ${isMySQL ? 'TIMESTAMP' : 'DATETIME'} DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
@@ -29,6 +29,15 @@ export class TemplateMigration implements Migration {
 
     // Example: Add index
     // await this.dbConnection.execute('CREATE INDEX IF NOT EXISTS idx_example_name ON example_table(name)');
+
+    // Example: Insert data with database-agnostic placeholders
+    // For queries with parameters, add this helper method:
+    // private createPlaceholder(index: number): string {
+    //   return config.database.type === 'postgresql' ? `$${index + 1}` : '?';
+    // }
+    //
+    // Then use: const insertSQL = `INSERT INTO example_table (name) VALUES (${this.createPlaceholder(0)})`;
+    // await this.dbConnection.execute(insertSQL, ['Example Name']);
   }
 
   async down(): Promise<void> {
@@ -70,7 +79,7 @@ MIGRATION CREATION STEPS:
 NOTES:
 - Always test both up() and down() methods
 - Use IF NOT EXISTS and IF EXISTS for safety
-- Consider database type differences (MySQL vs SQLite)
+- Consider database type differences (PostgreSQL vs SQLite)
 - Make migrations atomic (use transactions when needed)
 - Never modify existing migrations that have been run in production
 */

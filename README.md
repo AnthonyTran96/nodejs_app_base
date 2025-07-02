@@ -32,13 +32,14 @@ Application Bootstrap
 ✅ **DTO Validation** with class-validator  
 ✅ **Authentication** (JWT + cookies)  
 ✅ **Authorization** (enum-based role access control)  
-✅ **Database Integration** (SQLite for dev, MySQL for production)  
+✅ **Database Integration** (SQLite for dev, PostgreSQL for production)  
 ✅ **Repository Pattern** for data access  
 ✅ **Unit of Work** pattern for transactions  
+✅ **Database Migrations** with versioning system  
 ✅ **Comprehensive Testing** (Unit, Integration, E2E)  
 ✅ **Code Quality** (ESLint + Prettier)  
 ✅ **Logging** with Winston  
-✅ **Environment Configuration**  
+✅ **Environment Configuration** with validation  
 
 ## 📁 Project Structure
 
@@ -55,6 +56,9 @@ src/
 │   ├── unit-of-work.ts # Transaction management
 │   └── index.ts        # Route initialization
 ├── database/           # Database connection & migrations
+│   ├── connection.ts   # PostgreSQL/SQLite connection
+│   ├── migrations/     # Database schema migrations
+│   └── seeds/          # Sample data seeding
 ├── middleware/         # Express middleware
 ├── types/              # TypeScript type definitions
 │   ├── role.enum.ts    # 🎭 Role enum & type definitions
@@ -81,6 +85,11 @@ tests/
 ├── unit/               # Unit tests
 ├── integration/        # Integration tests
 └── e2e/                # End-to-end tests
+
+docs/
+├── ONBOARDING.md           # 📖 Complete development guide
+├── DATABASE_MIGRATION_GUIDE.md # Database management
+└── ENVIRONMENT_SETUP.md    # Environment configuration
 ```
 
 ## 📦 Module Registry System
@@ -137,6 +146,18 @@ if (user.role === Role.ADMIN) {
 - ✅ **Single source of truth** for all roles
 - ✅ **Refactor-safe** - renaming updates everywhere
 
+## 🗄️ Database Support
+
+### Development
+- **SQLite**: Automatic setup, file-based database
+- **Auto-migrations**: Runs automatically on startup
+- **Sample data**: Seeding with realistic test data
+
+### Production
+- **PostgreSQL**: Recommended for production use
+- **Connection pooling**: Optimized for concurrent requests
+- **Migration control**: Manual migration approval for safety
+
 ## 🚀 Quick Start
 
 ### 1. Install Dependencies
@@ -145,12 +166,24 @@ npm install
 ```
 
 ### 2. Environment Setup
-Copy the environment template:
 ```bash
+# Copy environment template
 cp .env.example .env
+
+# For detailed environment configuration:
+# See docs/ENVIRONMENT_SETUP.md
 ```
 
-The project comes with development-ready environment variables.
+Basic development configuration:
+```env
+NODE_ENV=development
+PORT=3000
+DB_TYPE=sqlite
+DB_SQLITE_PATH=./database.sqlite
+JWT_SECRET=your-development-jwt-secret-key-32-chars
+JWT_REFRESH_SECRET=your-development-refresh-secret-32-chars
+COOKIE_SECRET=your-development-cookie-secret-32-chars
+```
 
 ### 3. Build the Project
 ```bash
@@ -243,8 +276,20 @@ npm run build
 npx tsc --noEmit
 ```
 
-### Database
-The project uses SQLite for development and supports MySQL for production. The database is automatically initialized with the required tables on startup.
+### Database Management
+```bash
+# Run migrations
+npm run db:migrate
+
+# Check migration status
+npm run db:migrate:status
+
+# Rollback last migration
+npm run db:migrate:rollback
+
+# Run seeds
+npm run db:seed
+```
 
 ## 🛡️ Security Features
 
@@ -255,17 +300,19 @@ The project uses SQLite for development and supports MySQL for production. The d
 - **Security headers** with Helmet.js
 - **CORS configuration**
 - **Request logging**
+- **Environment validation** for production safety
 
 ## 📖 Documentation
 
-See [ONBOARDING.md](./ONBOARDING.md) for detailed documentation on:
-- Adding new features and modules
-- Dependency injection setup
-- Database migrations
-- Testing strategies
-- Authentication & authorization
-- API conventions
-- Debugging tips
+### 📚 **Complete Guides:**
+- **[docs/ONBOARDING.md](docs/ONBOARDING.md)** - Complete development guide with module creation, role system, testing strategies
+- **[docs/DATABASE_MIGRATION_GUIDE.md](docs/DATABASE_MIGRATION_GUIDE.md)** - Database migration system, PostgreSQL/SQLite setup
+- **[docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md)** - Environment configuration, validation rules, troubleshooting
+
+### 🎯 **What each guide covers:**
+- **ONBOARDING**: Architecture, adding modules, testing, debugging
+- **DATABASE_MIGRATION**: Migrations, seeds, PostgreSQL setup
+- **ENVIRONMENT_SETUP**: Configuration for dev/test/production
 
 ## 🌟 Key Components
 
@@ -305,7 +352,7 @@ export class UserService {
 }
 ```
 
-### Validation
+### Validation with Role Enums
 Request validation with decorators and enum validation:
 
 ```typescript
@@ -327,6 +374,22 @@ export class CreateUserDto {
 }
 ```
 
+### Database-Agnostic Repositories
+Support for both SQLite and PostgreSQL:
+
+```typescript
+export class BaseRepository<T> {
+  protected createPlaceholder(index: number): string {
+    return this.dbType === 'postgresql' ? `$${index + 1}` : '?';
+  }
+
+  protected async executeQuery<R>(sql: string, params: any[] = []): Promise<QueryResult<R>> {
+    // Handles both PostgreSQL and SQLite parameter styles
+    return await this.dbConnection.query<R>(sql, params);
+  }
+}
+```
+
 ### Path Aliases
 Clean imports with TypeScript path mapping:
 
@@ -343,7 +406,7 @@ import { logger } from '@/utils/logger';
 // src/app.ts
 export class Application {
   async initialize(): Promise<void> {
-    await this.setupDatabase();           // ✅ Database connection
+    await this.setupDatabase();           // ✅ Database connection + migrations
     this.setupMiddleware();               // ✅ Express middleware
     await this.containerSetup.setupDependencies(); // ✅ Module registry + DI
     this.setupRoutes();                   // ✅ Routes initialization
@@ -381,7 +444,7 @@ Standardized API responses:
 - **Runtime**: Node.js 18+
 - **Language**: TypeScript
 - **Framework**: Express.js
-- **Database**: SQLite (dev) / MySQL (prod)
+- **Database**: SQLite (dev) / PostgreSQL (prod)
 - **Authentication**: JWT
 - **Validation**: class-validator
 - **Testing**: Jest + Supertest
@@ -393,20 +456,21 @@ Standardized API responses:
 
 ✅ **Build**: Compiles successfully  
 ✅ **Server**: Runs on port 3000  
-✅ **Database**: SQLite initialized  
+✅ **Database**: SQLite initialized with auto-migrations  
 ✅ **API**: Health endpoint working  
-✅ **Tests**: All tests passing  
+✅ **Tests**: All tests passing (Unit + Integration + E2E)  
 ✅ **Architecture**: Clean layered structure with Module Registry  
 ✅ **Module Registry**: Zero-conflict module registration  
 ✅ **Role System**: Type-safe enum-based roles  
 ✅ **Path Aliases**: Configured for clean imports  
 ✅ **Documentation**: Comprehensive guides available  
-✅ **Logging**: Route initialization tracking  
+✅ **PostgreSQL Support**: Production-ready database setup  
+✅ **Environment Validation**: Safe configuration management  
 
 ## 🤝 Contributing
 
 1. Follow the established architecture patterns
-2. **Use Module Registry Pattern** for new modules (see template)
+2. **Use Module Registry Pattern** for new modules (see `src/core/template.registry.ts.example`)
 3. **Use Role enum** for type-safe role management
 4. Add tests for new features
 5. Update documentation as needed
@@ -418,16 +482,12 @@ Standardized API responses:
 # 1. Copy template
 cp src/core/template.registry.ts.example src/modules/your-module/your-module.registry.ts
 
-# 2. Edit template
-# 3. Add 1 line to container-setup.ts
+# 2. Edit template with your module services
+# 3. Add 1 line to container-setup.ts: await import('@/modules/your-module/your-module.registry');
 # 4. Zero conflicts! ✨
 ```
 
-## 📚 Documentation
-
-- **[ONBOARDING.md](docs/ONBOARDING.md)** - Complete development guide
-- **[MODULE_REGISTRY_GUIDE.md](docs/MODULE_REGISTRY_GUIDE.md)** - Module registry system
-- **[README.md](docs/README.md)** - Module registry quick reference
+For detailed module creation guide, see **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 
 ## 📝 License
 

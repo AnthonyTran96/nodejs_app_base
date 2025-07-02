@@ -6,6 +6,7 @@ export class DatabaseConnection implements IDBConnection {
   private static instance: DatabaseConnection;
   private connection: unknown;
   private dbType: DatabaseType;
+  private isConnected: boolean = false;
 
   private constructor() {
     this.dbType = config.database.type;
@@ -22,10 +23,11 @@ export class DatabaseConnection implements IDBConnection {
     try {
       if (this.dbType === 'sqlite') {
         await this.initializeSQLite();
-      } else if (this.dbType === 'mysql') {
-        await this.initializeMySQL();
+      } else if (this.dbType === 'postgresql') {
+        await this.initializePostgreSQL();
       }
 
+      this.isConnected = true;
       logger.info(`✅ ${this.dbType.toUpperCase()} database initialized`);
     } catch (error) {
       logger.error('Database initialization failed:', error);
@@ -47,15 +49,18 @@ export class DatabaseConnection implements IDBConnection {
     });
   }
 
-  private async initializeMySQL(): Promise<void> {
-    const mysql = require('mysql2/promise');
+  private async initializePostgreSQL(): Promise<void> {
+    const { Pool } = require('pg');
 
-    this.connection = await mysql.createConnection({
+    this.connection = new Pool({
       host: config.database.host,
       port: config.database.port,
       user: config.database.username,
       password: config.database.password,
       database: config.database.database,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
     });
   }
 
@@ -63,7 +68,7 @@ export class DatabaseConnection implements IDBConnection {
     if (this.dbType === 'sqlite') {
       return this.querySQLite<T>(sql, params);
     } else {
-      return this.queryMySQL<T>(sql, params);
+      return this.queryPostgreSQL<T>(sql, params);
     }
   }
 
@@ -84,13 +89,13 @@ export class DatabaseConnection implements IDBConnection {
     });
   }
 
-  private async queryMySQL<T>(sql: string, params: unknown[]): Promise<QueryResult<T>> {
-    const connection = this.connection as any;
-    const [rows] = await connection.execute(sql, params);
+  private async queryPostgreSQL<T>(sql: string, params: unknown[]): Promise<QueryResult<T>> {
+    const pool = this.connection as any;
+    const result = await pool.query(sql, params);
 
     return {
-      rows: Array.isArray(rows) ? rows : [rows],
-      rowCount: Array.isArray(rows) ? rows.length : 1,
+      rows: result.rows || [],
+      rowCount: result.rowCount || 0,
     };
   }
 
@@ -98,7 +103,7 @@ export class DatabaseConnection implements IDBConnection {
     if (this.dbType === 'sqlite') {
       await this.executeSQLite(sql, params);
     } else {
-      await this.executeMySQL(sql, params);
+      await this.executePostgreSQL(sql, params);
     }
   }
 
@@ -116,50 +121,50 @@ export class DatabaseConnection implements IDBConnection {
     });
   }
 
-  private async executeMySQL(sql: string, params: unknown[]): Promise<void> {
-    const connection = this.connection as any;
-    await connection.execute(sql, params);
+  private async executePostgreSQL(sql: string, params: unknown[]): Promise<void> {
+    const pool = this.connection as any;
+    await pool.query(sql, params);
   }
 
   async beginTransaction(): Promise<void> {
-    if (this.dbType === 'sqlite') {
-      await this.execute('BEGIN TRANSACTION');
-    } else {
-      const connection = this.connection as any;
-      await connection.beginTransaction();
-    }
+    const beginSQL = this.dbType === 'sqlite' ? 'BEGIN TRANSACTION' : 'BEGIN';
+    await this.execute(beginSQL);
   }
 
   async commit(): Promise<void> {
-    if (this.dbType === 'sqlite') {
-      await this.execute('COMMIT');
-    } else {
-      const connection = this.connection as any;
-      await connection.commit();
-    }
+    await this.execute('COMMIT');
   }
 
   async rollback(): Promise<void> {
-    if (this.dbType === 'sqlite') {
-      await this.execute('ROLLBACK');
-    } else {
-      const connection = this.connection as any;
-      await connection.rollback();
-    }
+    await this.execute('ROLLBACK');
   }
 
   async close(): Promise<void> {
-    if (this.connection) {
+    if (!this.connection || !this.isConnected) return;
+
+    try {
       if (this.dbType === 'sqlite') {
         const db = this.connection as any;
-        return new Promise(resolve => {
-          db.close(() => {
-            resolve();
+        await new Promise<void>((resolve, reject) => {
+          db.close((err: Error) => {
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
           });
         });
       } else {
-        const connection = this.connection as any;
-        await connection.end();
+        const pool = this.connection as any;
+        await pool.end();
+      }
+
+      this.isConnected = false;
+    } catch (error) {
+      // Ignore errors if database is already closed
+      if (error && (error as any).code !== 'SQLITE_MISUSE') {
+        logger.error('Error closing database connection:', error);
+        throw error;
       }
     }
   }

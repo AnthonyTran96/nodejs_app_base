@@ -47,8 +47,8 @@ function validateEnvironment(): void {
 
   // 🗄️ Database type validation
   const dbType = process.env.DB_TYPE;
-  if (dbType && !['sqlite', 'mysql'].includes(dbType)) {
-    errors.push(`Invalid DB_TYPE: ${dbType}. Must be 'sqlite' or 'mysql'`);
+  if (dbType && !['sqlite', 'postgresql'].includes(dbType)) {
+    errors.push(`Invalid DB_TYPE: ${dbType}. Must be 'sqlite' or 'postgresql'`);
   }
 
   // 🏭 Production database validation
@@ -56,15 +56,15 @@ function validateEnvironment(): void {
   if (nodeEnv === 'production') {
     const currentDbType = dbType || 'sqlite';
 
-    if (currentDbType === 'mysql') {
-      const requiredMySQLVars = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
-      const missingMySQLVars = requiredMySQLVars.filter(key => !process.env[key]);
+    if (currentDbType === 'postgresql') {
+      const requiredPostgreSQLVars = ['DB_HOST', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE'];
+      const missingPostgreSQLVars = requiredPostgreSQLVars.filter(key => !process.env[key]);
 
-      if (missingMySQLVars.length > 0) {
-        errors.push(`Production MySQL requires: ${missingMySQLVars.join(', ')}`);
+      if (missingPostgreSQLVars.length > 0) {
+        errors.push(`Production PostgreSQL requires: ${missingPostgreSQLVars.join(', ')}`);
       }
     } else {
-      warnings.push('🚨 Production using SQLite - consider MySQL for production environments');
+      warnings.push('🚨 Production using SQLite - consider PostgreSQL for production environments');
     }
 
     // Production secrets strength check
@@ -166,8 +166,8 @@ export const config: Config = {
   database: {
     type: (process.env.DB_TYPE as DatabaseType) || 'sqlite',
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    username: process.env.DB_USERNAME || 'root',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     database: process.env.DB_DATABASE || 'nodejs_backend',
     sqlitePath: process.env.DB_SQLITE_PATH || './database.sqlite',

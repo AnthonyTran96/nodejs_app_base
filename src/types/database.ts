@@ -1,4 +1,4 @@
-export type DatabaseType = 'sqlite' | 'mysql';
+export type DatabaseType = 'sqlite' | 'postgresql';
 
 export interface DatabaseConfig {
   type: DatabaseType;

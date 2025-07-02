@@ -15,57 +15,57 @@ export class CreateSampleUsersSeed implements Seed {
     this.dbConnection = DatabaseConnection.getInstance();
   }
 
-  async run(): Promise<void> {
-    // Check if users already exist to avoid duplicates
-    const existingAdmin = await this.dbConnection.query('SELECT id FROM users WHERE email = ?', [
-      'admin@example.com',
-    ]);
-
-    const existingUser = await this.dbConnection.query('SELECT id FROM users WHERE email = ?', [
-      'user@example.com',
-    ]);
-
-    // Create sample admin user if not exists
-    if (existingAdmin.rows.length === 0) {
-      const hashedPassword = await HashUtil.hash('admin123');
-
-      const insertSQL =
-        config.database.type === 'sqlite'
-          ? 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)'
-          : 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)';
-
-      await this.dbConnection.execute(insertSQL, [
-        'admin@example.com',
-        hashedPassword,
-        'Admin User',
-        Role.ADMIN,
-      ]);
-
-      logger.info('✅ Admin user created: admin@example.com / admin123');
+  // Helper method for database-specific placeholder
+  private createPlaceholder(index: number): string {
+    if (config.database.type === 'postgresql') {
+      return `$${index + 1}`;
     } else {
-      logger.info('ℹ️  Admin user already exists');
+      return '?';
     }
+  }
 
-    // Create sample regular user if not exists
+  // Helper method to create a user if not exists
+  private async createUserIfNotExists(
+    email: string,
+    password: string,
+    name: string,
+    role: Role,
+    description: string
+  ): Promise<void> {
+    const existingUser = await this.dbConnection.query(
+      `SELECT id FROM users WHERE email = ${this.createPlaceholder(0)}`,
+      [email]
+    );
+
     if (existingUser.rows.length === 0) {
-      const hashedUserPassword = await HashUtil.hash('user123');
+      const hashedPassword = await HashUtil.hash(password);
+      const insertSQL = `INSERT INTO users (email, password, name, role) VALUES (${this.createPlaceholder(0)}, ${this.createPlaceholder(1)}, ${this.createPlaceholder(2)}, ${this.createPlaceholder(3)})`;
 
-      const insertSQL =
-        config.database.type === 'sqlite'
-          ? 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)'
-          : 'INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)';
-
-      await this.dbConnection.execute(insertSQL, [
-        'user@example.com',
-        hashedUserPassword,
-        'Regular User',
-        Role.USER,
-      ]);
-
-      logger.info('✅ Regular user created: user@example.com / user123');
+      await this.dbConnection.execute(insertSQL, [email, hashedPassword, name, role]);
+      logger.info(`✅ ${description} created: ${email} / ${password}`);
     } else {
-      logger.info('ℹ️  Regular user already exists');
+      logger.info(`ℹ️  ${description} already exists`);
     }
+  }
+
+  async run(): Promise<void> {
+    // Create sample admin user
+    await this.createUserIfNotExists(
+      'admin@example.com',
+      'admin123',
+      'Admin User',
+      Role.ADMIN,
+      'Admin user'
+    );
+
+    // Create sample regular user
+    await this.createUserIfNotExists(
+      'user@example.com',
+      'user123',
+      'Regular User',
+      Role.USER,
+      'Regular user'
+    );
 
     logger.info('🎯 Sample users seed completed');
   }
