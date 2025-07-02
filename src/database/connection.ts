@@ -147,7 +147,7 @@ export class DatabaseConnection implements IDBConnection {
         const db = this.connection as any;
         await new Promise<void>((resolve, reject) => {
           db.close((err: Error) => {
-            if (err) {
+            if (err && err.message && !err.message.includes('SQLITE_MISUSE')) {
               reject(err);
             } else {
               resolve();
@@ -159,13 +159,18 @@ export class DatabaseConnection implements IDBConnection {
         await pool.end();
       }
 
+      this.connection = null;
       this.isConnected = false;
+      logger.info(`✅ ${this.dbType.toUpperCase()} database connection closed`);
     } catch (error) {
       // Ignore errors if database is already closed
       if (error && (error as any).code !== 'SQLITE_MISUSE') {
         logger.error('Error closing database connection:', error);
-        throw error;
       }
+      
+      // Still mark as closed even if error occurred
+      this.connection = null;
+      this.isConnected = false;
     }
   }
 }
