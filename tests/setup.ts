@@ -3,9 +3,7 @@
 
 import { DatabaseConnection } from '@/database/connection';
 import { MigrationManager } from '@/database/migrations/migration-manager';
-
-// Import migrations to register them
-import '@/database/migrations';
+import { registerMigrations } from '@/database/migrations';
 
 // Global test setup
 beforeAll(async () => {
@@ -16,6 +14,7 @@ beforeAll(async () => {
     
     // Run migrations for test environment
     const migrationManager = new MigrationManager();
+    registerMigrations(migrationManager);
     await migrationManager.runPendingMigrations();
     
     console.log('✅ Test database initialized with migrations');

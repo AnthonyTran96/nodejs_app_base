@@ -22,4 +22,7 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/tests/e2e/setup.ts'],
   testTimeout: 30000,
   maxWorkers: 1,
+  // Debug options to identify hanging handles
+  detectOpenHandles: true,
+  forceExit: true,
 }; 
