@@ -167,7 +167,7 @@ export class DatabaseConnection implements IDBConnection {
       if (error && (error as any).code !== 'SQLITE_MISUSE') {
         logger.error('Error closing database connection:', error);
       }
-      
+
       // Still mark as closed even if error occurred
       this.connection = null;
       this.isConnected = false;

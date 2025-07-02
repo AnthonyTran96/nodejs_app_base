@@ -11,7 +11,9 @@ export class AuthMiddleware {
       const token = AuthMiddleware.extractToken(req);
 
       if (!token) {
-        throw new UnauthorizedError('Access token is required');
+        const error = new UnauthorizedError('Access token is required');
+        next(error);
+        return;
       }
 
       const payload = jwt.verify(token, config.jwt.secret) as JwtPayload;

@@ -39,12 +39,17 @@ export class ForbiddenError extends Error {
 }
 
 export const errorHandler = (
-  error: AppError,
+  error: AppError | Error,
   req: Request,
   res: Response,
   // eslint-disable-next-line no-unused-vars
   _next: NextFunction
 ): void => {
+  // Prevent multiple responses
+  if (res.headersSent) {
+    return;
+  }
+
   // Log error details
   logger.error('Error occurred:', {
     message: error.message,
@@ -52,35 +57,47 @@ export const errorHandler = (
     url: req.url,
     method: req.method,
     ip: req.ip,
+    userAgent: req.get('User-Agent'),
   });
 
-  // Handle different error types
-  if (error instanceof ValidationError) {
-    ResponseUtil.validationError(res, error.errors, error.message);
-    return;
-  }
+  try {
+    // Handle different error types
+    if (error instanceof ValidationError) {
+      ResponseUtil.validationError(res, error.errors, error.message);
+      return;
+    }
 
-  if (error instanceof NotFoundError) {
-    ResponseUtil.notFound(res, error.message);
-    return;
-  }
+    if (error instanceof NotFoundError) {
+      ResponseUtil.notFound(res, error.message);
+      return;
+    }
 
-  if (error instanceof UnauthorizedError) {
-    ResponseUtil.unauthorized(res, error.message);
-    return;
-  }
+    if (error instanceof UnauthorizedError) {
+      ResponseUtil.unauthorized(res, error.message);
+      return;
+    }
 
-  if (error instanceof ForbiddenError) {
-    ResponseUtil.forbidden(res, error.message);
-    return;
-  }
+    if (error instanceof ForbiddenError) {
+      ResponseUtil.forbidden(res, error.message);
+      return;
+    }
 
-  // Handle known HTTP errors
-  if (error.statusCode) {
-    ResponseUtil.error(res, error.message, error.statusCode);
-    return;
-  }
+    // Handle known HTTP errors
+    if ((error as AppError).statusCode) {
+      ResponseUtil.error(res, error.message, (error as AppError).statusCode!);
+      return;
+    }
 
-  // Default to 500 internal server error
-  ResponseUtil.error(res, 'Internal Server Error', 500);
+    // Default to 500 internal server error
+    ResponseUtil.error(res, 'Internal Server Error', 500);
+  } catch (responseError) {
+    // Last resort - if response utility fails
+    logger.error('Error in error handler:', responseError);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+      });
+    }
+  }
 };
