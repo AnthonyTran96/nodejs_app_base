@@ -77,6 +77,22 @@ export class Application {
   }
 
   private setupMiddleware(): void {
+    // Request timeout - prevent hanging requests
+    this.app.use((req, res, next) => {
+      const timeout = setTimeout(() => {
+        if (!res.headersSent) {
+          logger.error(`Request timeout: ${req.method} ${req.url}`);
+          res.status(408).json({
+            success: false,
+            message: 'Request timeout',
+          });
+        }
+      }, 30000); // 30 second timeout
+
+      res.on('finish', () => clearTimeout(timeout));
+      next();
+    });
+
     // Security middleware
     this.app.use(helmet());
     this.app.use(

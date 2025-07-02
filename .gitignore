@@ -44,4 +44,10 @@ Thumbs.db
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Test reports and documentation
+reports/*
+!reports/README.md
+test-reports/
+*.test-report.* 

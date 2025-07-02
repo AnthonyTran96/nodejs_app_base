@@ -20,7 +20,8 @@ export function ValidationMiddleware<T>(
 
       if (errors.length > 0) {
         const validationErrors = formatValidationErrors(errors);
-        next(new ValidationError('Validation failed', validationErrors));
+        const error = new ValidationError('Validation failed', validationErrors);
+        next(error);
         return;
       }
 
