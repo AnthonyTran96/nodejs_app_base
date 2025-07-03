@@ -94,19 +94,80 @@ export class Application {
     });
 
     // Security middleware
-    this.app.use(helmet());
+    this.app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            upgradeInsecureRequests: [],
+          },
+        },
+        hsts: {
+          maxAge: 31536000, // 1 year
+          includeSubDomains: true,
+          preload: true,
+        },
+        noSniff: true,
+        xssFilter: true,
+        referrerPolicy: { policy: 'same-origin' },
+      })
+    );
+
     this.app.use(
       cors({
-        origin: config.nodeEnv === 'production' ? [] : true, // Configure for production
+        origin: config.allowedOrigins,
         credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        exposedHeaders: ['X-Total-Count'],
+        maxAge: 86400, // 24 hours preflight cache
       })
     );
 
     // Request processing
     this.app.use(compression() as unknown as RequestHandler);
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    this.app.use(
+      express.json({
+        limit: '1mb',
+        verify: (req, _res, buf) => {
+          // Store raw body for potential debugging
+          (req as any).rawBody = buf;
+        },
+      })
+    );
+    this.app.use(
+      express.urlencoded({
+        extended: true,
+        limit: '1mb',
+        verify: (req, _res, buf) => {
+          // Store raw body for potential debugging
+          (req as any).rawBody = buf;
+        },
+      })
+    );
     this.app.use(cookieParser(config.cookieSecret));
+
+    // Custom error handler for payload too large
+    this.app.use((error: any, req: any, res: any, next: any) => {
+      if (error && error.type === 'entity.too.large') {
+        logger.warn(`Request too large: ${req.method} ${req.url}`, {
+          contentLength: req.get('content-length'),
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        });
+
+        return res.status(413).json({
+          success: false,
+          message: 'Request payload too large. Maximum size allowed is 1MB.',
+          error: 'PAYLOAD_TOO_LARGE',
+          maxSize: '1MB',
+        });
+      }
+      next(error);
+    });
 
     // Logging
     this.app.use(requestLogger);

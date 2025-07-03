@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { UserController } from '@/user/user.controller';
 import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
+import { SanitizeUserInput } from '@/middleware/sanitization.middleware';
 import { AuthGuard, RoleGuard } from '@/middleware/auth.middleware';
 import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from '@/user/user.dto';
 import { IdParamDto, PaginationDto } from '@/types/common.dto';
@@ -29,6 +30,7 @@ export function createUserRoutes(userController: UserController): Router {
   router.post(
     '/',
     RoleGuard(Role.ADMIN),
+    SanitizeUserInput(),
     ValidateBody(CreateUserDto),
     userController.createUser.bind(userController)
   );
@@ -36,6 +38,7 @@ export function createUserRoutes(userController: UserController): Router {
   router.put(
     '/:id',
     ValidateParams(IdParamDto),
+    SanitizeUserInput(),
     ValidateBody(UpdateUserDto),
     userController.updateUser.bind(userController)
   );
@@ -50,6 +53,7 @@ export function createUserRoutes(userController: UserController): Router {
   // User actions
   router.post(
     '/change-password',
+    SanitizeUserInput(),
     ValidateBody(ChangePasswordDto),
     userController.changePassword.bind(userController)
   );
