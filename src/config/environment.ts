@@ -29,6 +29,7 @@ export interface Config {
     readonly refreshSecret: string;
     readonly refreshExpiresIn: string;
   };
+  readonly allowedOrigins: string[];
   readonly cookieSecret: string;
   readonly logLevel: string;
 }
@@ -134,6 +135,37 @@ function validateEnvironment(): void {
     warnings.push(`Invalid LOG_LEVEL: ${logLevel}. Valid values: error, warn, info, debug`);
   }
 
+  // 🌐 CORS origins validation
+  const allowedOrigins = process.env.ALLOWED_ORIGINS;
+  if (allowedOrigins) {
+    const origins = allowedOrigins.split(',').map(origin => origin.trim());
+
+    if (nodeEnv === 'production') {
+      const invalidOrigins = origins.filter(
+        origin => !origin.startsWith('https://') && !origin.startsWith('http://localhost')
+      );
+
+      if (invalidOrigins.length > 0) {
+        warnings.push(`🔒 Production origins should use HTTPS: ${invalidOrigins.join(', ')}`);
+      }
+    } else {
+      // Development: warn about production origins in dev
+      const productionOrigins = origins.filter(
+        origin => origin.startsWith('https://') && !origin.includes('localhost')
+      );
+
+      if (productionOrigins.length > 0) {
+        warnings.push(
+          `💡 Using production HTTPS origins in development: ${productionOrigins.join(', ')}`
+        );
+      }
+    }
+  } else if (nodeEnv === 'production') {
+    warnings.push(
+      '🚨 ALLOWED_ORIGINS not set in production - using default domain. Set ALLOWED_ORIGINS for security.'
+    );
+  }
+
   // 🚨 Report errors and warnings
   if (warnings.length > 0) {
     console.warn('⚠️  Environment Configuration Warnings:');
@@ -187,6 +219,19 @@ export const config: Config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET!,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
   },
+
+  allowedOrigins: process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : process.env.NODE_ENV === 'production'
+      ? ['https://yourdomain.com']
+      : [
+          `http://localhost:${parseInt(process.env.PORT || '3000', 10)}`,
+          `http://127.0.0.1:${parseInt(process.env.PORT || '3000', 10)}`,
+          'http://localhost:3000', // Fallback cho common dev port
+          'http://localhost:3001', // Fallback cho common dev port
+          'http://127.0.0.1:3000',
+          'http://127.0.0.1:3001',
+        ],
 
   cookieSecret: process.env.COOKIE_SECRET!,
   logLevel: process.env.LOG_LEVEL || 'info',
