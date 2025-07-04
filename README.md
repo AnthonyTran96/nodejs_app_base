@@ -60,6 +60,11 @@ src/
 │   ├── migrations/     # Database schema migrations
 │   └── seeds/          # Sample data seeding
 ├── middleware/         # Express middleware
+├── routes/             # 🛣️ Centralized API routes
+│   ├── index.ts        # Main routes initialization & overview
+│   ├── auth.routes.ts  # Authentication routes
+│   ├── user.routes.ts  # User management routes
+│   └── README.md       # Routes documentation & guidelines
 ├── types/              # TypeScript type definitions
 │   ├── role.enum.ts    # 🎭 Role enum & type definitions
 │   ├── common.ts       # Common interfaces and types
@@ -69,13 +74,11 @@ src/
 │   ├── auth/           # Authentication module
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
-│   │   ├── auth.routes.ts
 │   │   └── auth.registry.ts # 🔧 Auth module registration
 │   └── user/           # User management module
 │       ├── user.controller.ts
 │       ├── user.service.ts
 │       ├── user.repository.ts
-│       ├── user.routes.ts
 │       ├── user.dto.ts
 │       └── user.registry.ts # 🔧 User module registration
 ├── models/             # Data models and interfaces
@@ -115,6 +118,9 @@ ModuleRegistry.registerModule({
 
 // 2. Add ONE line to container-setup.ts:
 await import('@/modules/post/post.registry');
+
+// 3. Create routes in src/routes/post.routes.ts
+// 4. Register routes in src/routes/index.ts
 ```
 
 ## 🎭 Role System (Type-Safe)
@@ -415,8 +421,8 @@ export class Application {
 
   private setupRoutes(): void {
     try {
-      initializeRoutes();
-      this.app.use(config.apiPrefix, router);
+      const moduleRouter = initializeModuleRoutes();
+      this.app.use(config.apiPrefix, moduleRouter);
       logger.info('✅ Routes initialized successfully');
       logger.info(`🚀 API available at: ${config.apiPrefix}`);
     } catch (error) {
@@ -466,16 +472,18 @@ Standardized API responses:
 ✅ **Documentation**: Comprehensive guides available  
 ✅ **PostgreSQL Support**: Production-ready database setup  
 ✅ **Environment Validation**: Safe configuration management  
+✅ **Centralized Routes**: All routes organized in src/routes/  
 
 ## 🤝 Contributing
 
 1. Follow the established architecture patterns
 2. **Use Module Registry Pattern** for new modules (see `src/core/template.registry.ts.example`)
 3. **Use Role enum** for type-safe role management
-4. Add tests for new features
-5. Update documentation as needed
-6. Follow the code style (run `npm run format`)
-7. Ensure all checks pass (`npm run check`)
+4. **Add routes to src/routes/** directory for centralized route management
+5. Add tests for new features
+6. Update documentation as needed
+7. Follow the code style (run `npm run format`)
+8. Ensure all checks pass (`npm run check`)
 
 ### 🚀 **Adding New Modules:**
 ```bash
@@ -484,7 +492,9 @@ cp src/core/template.registry.ts.example src/modules/your-module/your-module.reg
 
 # 2. Edit template with your module services
 # 3. Add 1 line to container-setup.ts: await import('@/modules/your-module/your-module.registry');
-# 4. Zero conflicts! ✨
+# 4. Create routes in src/routes/your-module.routes.ts
+# 5. Register routes in src/routes/index.ts
+# 6. Zero conflicts! ✨
 ```
 
 For detailed module creation guide, see **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
@@ -497,4 +507,4 @@ MIT License - see LICENSE file for details.
 
 **Ready for conflict-free development!** 🎉
 
-Multiple developers can now work in parallel without merge conflicts using the **Module Registry Pattern**. 
+Multiple developers can now work in parallel without merge conflicts using the **Module Registry Pattern** and **Centralized Routes**. 

@@ -47,6 +47,11 @@ src/
 │   ├── error-handler.ts         # Error handling
 │   ├── not-found-handler.ts     # 404 handling
 │   └── request-logger.ts        # Request logging
+├── routes/             # 🛣️ Centralized API routes
+│   ├── index.ts        # Main routes initialization & overview
+│   ├── auth.routes.ts  # Authentication routes
+│   ├── user.routes.ts  # User management routes
+│   └── README.md       # Routes documentation & guidelines
 ├── types/              # TypeScript type definitions
 │   ├── role.enum.ts    # 🎭 Role enum and type definitions
 │   ├── common.ts       # Common interfaces and types
@@ -56,13 +61,11 @@ src/
 │   ├── auth/           # Authentication module
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
-│   │   ├── auth.routes.ts # 🔒 Now includes sanitization
 │   │   └── auth.registry.ts
 │   └── user/           # User management module
 │       ├── user.controller.ts
 │       ├── user.service.ts
 │       ├── user.repository.ts
-│       ├── user.routes.ts # 🔒 Now includes sanitization
 │       ├── user.dto.ts
 │       └── user.registry.ts
 └── models/             # Data models and interfaces
@@ -382,7 +385,6 @@ touch src/modules/post/post.dto.ts
 touch src/modules/post/post.repository.ts
 touch src/modules/post/post.service.ts
 touch src/modules/post/post.controller.ts
-touch src/modules/post/post.routes.ts
 touch src/modules/post/post.registry.ts
 ```
 
@@ -575,10 +577,51 @@ export class PostController {
 }
 ```
 
-### 7. Create Secure Routes
+### 7. Create Module Registry (🆕 Key Step!)
 
 ```typescript
-// src/modules/post/post.routes.ts
+// src/modules/post/post.registry.ts
+import { Container } from '@/core/container';
+import { ModuleRegistry } from '@/core/module-registry';
+
+ModuleRegistry.registerModule({
+  name: 'PostModule',
+  register: async (container: Container) => {
+    // Import services for this module only
+    const { PostRepository } = await import('@/modules/post/post.repository');
+    const { PostService } = await import('@/modules/post/post.service');
+    const { PostController } = await import('@/modules/post/post.controller');
+    
+    // Register services with dependencies
+    container.register('PostRepository', PostRepository);
+    
+    container.register('PostService', PostService, {
+      dependencies: ['PostRepository', 'UnitOfWork'],
+    });
+
+    container.register('PostController', PostController, {
+      dependencies: ['PostService'],
+    });
+  },
+});
+```
+
+### 8. Add to Container Setup (Only 1 line!)
+
+```typescript
+// src/core/container-setup.ts - Just add ONE line!
+private async loadModules(): Promise<void> {
+  await import('@/core/core.registry');
+  await import('@/modules/user/user.registry');
+  await import('@/modules/auth/auth.registry');
+  await import('@/modules/post/post.registry'); // ✅ Just add this line!
+}
+```
+
+### 9. Create Routes (🆕 Centralized Routes!)
+
+```typescript
+// src/routes/post.routes.ts
 import { Router } from 'express';
 import { PostController } from '@/modules/post/post.controller';
 import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
@@ -626,63 +669,27 @@ export function createPostRoutes(postController: PostController): Router {
 }
 ```
 
-### 8. Create Module Registry (🆕 Key Step!)
+### 10. Register Routes in Centralized Routes
 
 ```typescript
-// src/modules/post/post.registry.ts
-import { Container } from '@/core/container';
-import { ModuleRegistry } from '@/core/module-registry';
+// src/routes/index.ts - Add to initializeRoutes function
+import { createPostRoutes } from './post.routes';
 
-ModuleRegistry.registerModule({
-  name: 'PostModule',
-  register: async (container: Container) => {
-    // Import services for this module only
-    const { PostRepository } = await import('@/modules/post/post.repository');
-    const { PostService } = await import('@/modules/post/post.service');
-    const { PostController } = await import('@/modules/post/post.controller');
-    
-    // Register services with dependencies
-    container.register('PostRepository', PostRepository);
-    
-    container.register('PostService', PostService, {
-      dependencies: ['PostRepository', 'UnitOfWork'],
-    });
+export function initializeRoutes(): Router {
+  const router = Router();
+  const container = Container.getInstance();
 
-    container.register('PostController', PostController, {
-      dependencies: ['PostService'],
-    });
-  },
-});
-```
+  // Get controllers from container with proper typing
+  const authController = container.get<AuthController>('AuthController');
+  const userController = container.get<UserController>('UserController');
+  const postController = container.get<PostController>('PostController'); // Add this
 
-### 9. Add to Container Setup (Only 1 line!)
+  // Register route modules
+  router.use('/auth', createAuthRoutes(authController));
+  router.use('/users', createUserRoutes(userController));
+  router.use('/posts', createPostRoutes(postController)); // Add this line
 
-```typescript
-// src/core/container-setup.ts - Just add ONE line!
-private async loadModules(): Promise<void> {
-  await import('@/core/core.registry');
-  await import('@/modules/user/user.registry');
-  await import('@/modules/auth/auth.registry');
-  await import('@/modules/post/post.registry'); // ✅ Just add this line!
-}
-```
-
-### 10. Register Routes
-
-```typescript
-// src/core/index.ts - Add to initializeRoutes function
-export function initializeRoutes(): void {
-  try {
-    const authController = container.get<AuthController>('AuthController');
-    const userController = container.get<UserController>('UserController');
-    const postController = container.get<PostController>('PostController'); // Add this
-
-    router.use('/auth', createAuthRoutes(authController));
-    router.use('/users', createUserRoutes(userController));
-    router.use('/posts', createPostRoutes(postController)); // Add this line
-  } catch (error) {
-    logger.error('❌ Failed to initialize routes:', error);
-  }
+  return router;
 }
 ```
 
