@@ -59,4 +59,4 @@ export function createUserRoutes(userController: UserController): Router {
   );
 
   return router;
-} 
+}

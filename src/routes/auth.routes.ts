@@ -25,4 +25,4 @@ export function createAuthRoutes(authController: AuthController): Router {
   router.get('/profile', AuthGuard, authController.me.bind(authController));
 
   return router;
-} 
+}
