@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { UserController } from '@/user/user.controller';
+import { UserController } from '@/modules/user/user.controller';
 import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
 import { SanitizeUserInput } from '@/middleware/sanitization.middleware';
 import { AuthGuard, RoleGuard } from '@/middleware/auth.middleware';
-import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from '@/user/user.dto';
+import { CreateUserDto, UpdateUserDto, ChangePasswordDto } from '@/modules/user/user.dto';
 import { IdParamDto, PaginationDto } from '@/types/common.dto';
 import { Role } from '@/types/role.enum';
 

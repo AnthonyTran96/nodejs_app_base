@@ -165,16 +165,28 @@ export const SanitizeBody = (options?: SanitizeOptions) => SanitizeInput({ ...op
 export const SanitizeUserInput = () =>
   SanitizeInput({
     fields: [
-       // Basic user info
-       'name', 'email', 'username', 'firstName', 'lastName',
-       // Contact info
-       'phone', 'address', 'website',
-       // Professional info
-       'company', 'jobTitle', 'bio',
-       // Additional info
-       'description', 'notes', 'tagline',
-       // Communication
-       'comment', 'message', 'feedback'
+      // Basic user info
+      'name',
+      'email',
+      'username',
+      'firstName',
+      'lastName',
+      // Contact info
+      'phone',
+      'address',
+      'website',
+      // Professional info
+      'company',
+      'jobTitle',
+      'bio',
+      // Additional info
+      'description',
+      'notes',
+      'tagline',
+      // Communication
+      'comment',
+      'message',
+      'feedback',
     ],
     allowBasicHtml: false,
     logSanitization: true,
@@ -183,15 +195,28 @@ export const SanitizeUserInput = () =>
 export const SanitizeContentInput = () =>
   SanitizeInput({
     fields: [
-       // Content structure
-       'title', 'subtitle', 'content', 'body', 'text',
-       // Content metadata
-       'summary', 'excerpt', 'description', 'metaDescription',
-       'keywords', 'tags', 'category',
-       // Media content
-       'caption', 'alt', 'bio',
-       // Communication
-       'message', 'comment', 'feedback'
+      // Content structure
+      'title',
+      'subtitle',
+      'content',
+      'body',
+      'text',
+      // Content metadata
+      'summary',
+      'excerpt',
+      'description',
+      'metaDescription',
+      'keywords',
+      'tags',
+      'category',
+      // Media content
+      'caption',
+      'alt',
+      'bio',
+      // Communication
+      'message',
+      'comment',
+      'feedback',
     ],
     allowBasicHtml: true,
     logSanitization: true,

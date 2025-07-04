@@ -1,15 +1,8 @@
 import { Router } from 'express';
-import { Container } from '@/core/container';
-import { AuthController } from '@/auth/auth.controller';
-import { UserController } from '@/user/user.controller';
-import { createAuthRoutes } from '@/auth/auth.routes';
-import { createUserRoutes } from '@/user/user.routes';
+import { initializeRoutes as initializeModuleRoutes } from '@/routes';
 import { logger } from '@/utils/logger';
 
 export const router = Router();
-
-// Initialize controllers from container
-const container = Container.getInstance();
 
 // Health check
 router.get('/health', (_req, res) => {
@@ -46,14 +39,11 @@ router.get('/docs', (_req, res) => {
   });
 });
 
-// Register route modules
+// Register route modules using centralized routes
 export function initializeRoutes(): void {
   try {
-    const authController = container.get<AuthController>('AuthController');
-    const userController = container.get<UserController>('UserController');
-
-    router.use('/auth', createAuthRoutes(authController));
-    router.use('/users', createUserRoutes(userController));
+    const moduleRouter = initializeModuleRoutes();
+    router.use('/', moduleRouter);
   } catch (error) {
     logger.error('❌ Failed to initialize routes:', error);
     // Graceful degradation - routes will be registered when services are available

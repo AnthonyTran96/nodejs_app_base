@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { AuthController } from '@/auth/auth.controller';
+import { AuthController } from '@/modules/auth/auth.controller';
 import { ValidateBody } from '@/middleware/validation.middleware';
 import { SanitizeUserInput } from '@/middleware/sanitization.middleware';
 import { AuthGuard } from '@/middleware/auth.middleware';
-import { LoginDto, CreateUserDto } from '@/user/user.dto';
+import { LoginDto, CreateUserDto } from '@/modules/user/user.dto';
 
 export function createAuthRoutes(authController: AuthController): Router {
   const router = Router();
