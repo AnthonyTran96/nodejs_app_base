@@ -3,6 +3,7 @@ import { UserService } from '@/user/user.service';
 import { ResponseUtil } from '@/utils/response';
 import { AuthenticatedRequest } from '@/types/common';
 import { Service } from '@/core/container';
+import { NotFoundError, UnauthorizedError } from '@/middleware/error-handler';
 
 @Service('UserController')
 export class UserController {
@@ -35,8 +36,7 @@ export class UserController {
       const user = await this.userService.findById(Number(id));
 
       if (!user) {
-        ResponseUtil.notFound(res, 'User not found');
-        return;
+        throw new NotFoundError('User not found');
       }
 
       ResponseUtil.success(res, { user }, 'User retrieved successfully');
@@ -87,8 +87,7 @@ export class UserController {
   ): Promise<void> {
     try {
       if (!req.user) {
-        ResponseUtil.unauthorized(res, 'Authentication required');
-        return;
+        throw new UnauthorizedError('Authentication required');
       }
 
       const { currentPassword, newPassword } = req.body;

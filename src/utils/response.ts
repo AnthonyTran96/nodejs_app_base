@@ -54,6 +54,15 @@ export class ResponseUtil {
     });
   }
 
+  static businessLogicError(res: Response, errorCode: string, message = ''): Response<ApiResponse> {
+    // Use status code 400 or 422
+    return res.status(400).json({
+      success: false,
+      errorCode,
+      message,
+    });
+  }
+
   static notFound(res: Response, message = 'Resource not found'): Response<ApiResponse> {
     return res.status(404).json({
       success: false,
@@ -70,6 +79,16 @@ export class ResponseUtil {
 
   static forbidden(res: Response, message = 'Forbidden'): Response<ApiResponse> {
     return res.status(403).json({
+      success: false,
+      message,
+    });
+  }
+
+  static internalServerError(
+    res: Response,
+    message = 'Internal Server Error'
+  ): Response<ApiResponse> {
+    return res.status(500).json({
       success: false,
       message,
     });

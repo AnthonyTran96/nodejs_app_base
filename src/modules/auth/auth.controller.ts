@@ -4,6 +4,7 @@ import { UserService } from '@/user/user.service';
 import { ResponseUtil } from '@/utils/response';
 import { AuthenticatedRequest } from '@/types/common';
 import { Service } from '@/core/container';
+import { UnauthorizedError } from '@/middleware/error-handler';
 
 @Service('AuthController')
 export class AuthController {
@@ -51,8 +52,7 @@ export class AuthController {
       const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
 
       if (!refreshToken) {
-        ResponseUtil.unauthorized(res, 'Refresh token required');
-        return;
+        throw new UnauthorizedError('Refresh token required');
       }
 
       const tokens = await this.authService.refreshToken(refreshToken);
@@ -80,15 +80,13 @@ export class AuthController {
   async me(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {
-        ResponseUtil.unauthorized(res, 'Authentication required');
-        return;
+        throw new UnauthorizedError('Authentication required');
       }
 
       // Fetch full user object from database
       const user = await this.userService.findById(req.user.userId);
       if (!user) {
-        ResponseUtil.unauthorized(res, 'User not found');
-        return;
+        throw new UnauthorizedError('User not found');
       }
 
       ResponseUtil.success(res, { user }, 'Profile retrieved successfully');
