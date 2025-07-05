@@ -9,11 +9,21 @@ export interface AppError extends Error {
 
 export class ValidationError extends Error {
   constructor(
-    message: string,
+    message = 'Validation failed',
     public readonly errors: Record<string, string[]>
   ) {
     super(message);
     this.name = 'ValidationError';
+  }
+}
+
+export class BusinessLogicError extends Error {
+  constructor(
+    public readonly errorCode: string,
+    message = ''
+  ) {
+    super(message);
+    this.name = 'BusinessLogicError';
   }
 }
 
@@ -35,6 +45,13 @@ export class ForbiddenError extends Error {
   constructor(message = 'Forbidden') {
     super(message);
     this.name = 'ForbiddenError';
+  }
+}
+
+export class InternalServerError extends Error {
+  constructor(message = 'Internal Server Error') {
+    super(message);
+    this.name = 'InternalServerError';
   }
 }
 
@@ -67,6 +84,11 @@ export const errorHandler = (
       return;
     }
 
+    if (error instanceof BusinessLogicError) {
+      ResponseUtil.businessLogicError(res, error.errorCode, error.message);
+      return;
+    }
+
     if (error instanceof NotFoundError) {
       ResponseUtil.notFound(res, error.message);
       return;
@@ -79,6 +101,11 @@ export const errorHandler = (
 
     if (error instanceof ForbiddenError) {
       ResponseUtil.forbidden(res, error.message);
+      return;
+    }
+
+    if (error instanceof InternalServerError) {
+      ResponseUtil.internalServerError(res, error.message);
       return;
     }
 

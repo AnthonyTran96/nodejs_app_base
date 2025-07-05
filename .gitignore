@@ -51,3 +51,6 @@ reports/*
 !reports/README.md
 test-reports/
 *.test-report.* 
+
+# Cursor Ai
+memory-bank/
