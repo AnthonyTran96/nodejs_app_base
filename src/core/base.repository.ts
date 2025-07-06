@@ -1,6 +1,6 @@
 import { config } from '@/config/environment';
 import { DatabaseConnection } from '@/database/connection';
-import { PaginatedResult, PaginationOptions } from '@/types/common';
+import { AdvancedFilter, PaginatedResult, PaginationOptions } from '@/types/common';
 import { QueryResult } from '@/types/database';
 
 export abstract class BaseRepository<T> {
@@ -40,23 +40,66 @@ export abstract class BaseRepository<T> {
     return this.findByFilter({}, options);
   }
 
-  // Find records by filters, supports pagination and sorting
+  // Find records by advanced filters, supports pagination and sorting
   async findByFilter(
-    filters: Partial<T> = {},
+    filters: AdvancedFilter<T> = {},
     options?: PaginationOptions
   ): Promise<PaginatedResult<T>> {
     let sql = `SELECT * FROM ${this.tableName}`;
     const params: unknown[] = [];
-    const filterKeys = Object.keys(filters) as (keyof T)[];
-    const filtersRecord = filters as Record<string, unknown>;
+    const whereClauses: string[] = [];
+    let paramIdx = 0;
 
-    // Add WHERE clause if filters are provided
-    if (filterKeys.length > 0) {
-      const whereClauses = filterKeys.map(
-        (key, idx) => `${String(key)} = ${this.createPlaceholder(idx)}`
-      );
+    for (const key in filters) {
+      const filter = filters[key];
+      if (typeof filter === 'object' && filter !== null && 'op' in filter) {
+        switch (filter.op) {
+          case '=':
+            whereClauses.push(`${key} = ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case '!=':
+            whereClauses.push(`${key} != ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case '<':
+            whereClauses.push(`${key} < ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case '<=':
+            whereClauses.push(`${key} <= ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case '>':
+            whereClauses.push(`${key} > ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case '>=':
+            whereClauses.push(`${key} >= ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case 'like':
+            whereClauses.push(`${key} LIKE ${this.createPlaceholder(paramIdx++)}`);
+            params.push(filter.value);
+            break;
+          case 'in':
+            const arr = Array.isArray(filter.value) ? filter.value : [filter.value];
+            const inPlaceholders = arr
+              .map((_, i) => this.createPlaceholder(paramIdx + i))
+              .join(', ');
+            whereClauses.push(`${key} IN (${inPlaceholders})`);
+            params.push(...arr);
+            paramIdx += arr.length;
+            break;
+        }
+      } else {
+        whereClauses.push(`${key} = ${this.createPlaceholder(paramIdx++)}`);
+        params.push(filter);
+      }
+    }
+
+    if (whereClauses.length > 0) {
       sql += ' WHERE ' + whereClauses.join(' AND ');
-      filterKeys.forEach(key => params.push(filtersRecord[String(key)]));
     }
 
     // Sorting
@@ -67,10 +110,7 @@ export abstract class BaseRepository<T> {
 
     // Count total records (with filters)
     let countSql = `SELECT COUNT(*) as total FROM ${this.tableName}`;
-    if (filterKeys.length > 0) {
-      const whereClauses = filterKeys.map(
-        (key, idx) => `${String(key)} = ${this.createPlaceholder(idx)}`
-      );
+    if (whereClauses.length > 0) {
       countSql += ' WHERE ' + whereClauses.join(' AND ');
     }
     const countResult = await this.db.query<{ total: number }>(countSql, params);
@@ -79,8 +119,8 @@ export abstract class BaseRepository<T> {
     // Pagination
     if (options?.limit && options?.page) {
       const offset = (options.page - 1) * options.limit;
-      const limitPlaceholder = this.createPlaceholder(params.length);
-      const offsetPlaceholder = this.createPlaceholder(params.length + 1);
+      const limitPlaceholder = this.createPlaceholder(paramIdx);
+      const offsetPlaceholder = this.createPlaceholder(paramIdx + 1);
 
       sql += ` LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
       params.push(options.limit, offset);

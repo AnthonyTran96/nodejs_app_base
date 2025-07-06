@@ -1,11 +1,17 @@
-import { UserRepository } from '@/user/user.repository';
-import { UnitOfWork } from '@/core/unit-of-work';
-import { HashUtil } from '@/utils/hash';
-import { User, CreateUserRequest, UpdateUserRequest, UserResponse } from '@/models/user.model';
-import { PaginationOptions, PaginatedResult } from '@/types/common';
-import { ValidationError, NotFoundError } from '@/middleware/error-handler';
 import { Service } from '@/core/container';
+import { UnitOfWork } from '@/core/unit-of-work';
+import { NotFoundError, ValidationError } from '@/middleware/error-handler';
+import {
+  CreateUserRequest,
+  UpdateUserRequest,
+  User,
+  UserFilter,
+  UserResponse,
+} from '@/models/user.model';
+import { PaginatedResult, PaginationOptions } from '@/types/common';
 import { Role } from '@/types/role.enum';
+import { UserRepository } from '@/user/user.repository';
+import { HashUtil } from '@/utils/hash';
 
 @Service('UserService')
 export class UserService {
@@ -29,7 +35,29 @@ export class UserService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findByEmail(email);
+    const result = await this.userRepository.findByFilter({ email });
+    return result.data[0] || null;
+  }
+
+  async findByFilter(
+    filter: UserFilter = {},
+    options?: PaginationOptions
+  ): Promise<PaginatedResult<UserResponse>> {
+    const filters: any = {};
+    if (filter.name) {
+      filters.name = { op: 'like', value: `%${filter.name}%` };
+    }
+    if (filter.role) {
+      filters.role = filter.role;
+    }
+    if (filter.email) {
+      filters.email = { op: 'like', value: `%${filter.email}%` };
+    }
+    const result = await this.userRepository.findByFilter(filters, options);
+    return {
+      data: result.data.map(user => this.toUserResponse(user)),
+      meta: result.meta,
+    };
   }
 
   async create(userData: CreateUserRequest): Promise<UserResponse> {
