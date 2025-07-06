@@ -27,7 +27,7 @@ logs/
 coverage/
 
 # IDE
-.vscode/
+# .vscode/
 .idea/
 *.swp
 *.swo
