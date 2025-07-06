@@ -1,10 +1,10 @@
-import { UserService } from '@/user/user.service';
-import { UserRepository } from '@/user/user.repository';
 import { UnitOfWork } from '@/core/unit-of-work';
-import { ValidationError, NotFoundError } from '@/middleware/error-handler';
+import { NotFoundError, ValidationError } from '@/middleware/error-handler';
+import { Role } from '@/types/role.enum';
+import { UserRepository } from '@/user/user.repository';
+import { UserService } from '@/user/user.service';
 import { HashUtil } from '@/utils/hash';
 import { User } from '../../../src/models/user.model';
-import { Role } from '@/types/role.enum';
 
 // Mock dependencies
 jest.mock('@/user/user.repository');
@@ -36,6 +36,7 @@ describe('UserService', () => {
       delete: jest.fn(),
       emailExists: jest.fn(),
       countByRole: jest.fn(),
+      findByFilter: jest.fn(),
     } as any;
 
     mockUnitOfWork = {
@@ -94,7 +95,11 @@ describe('UserService', () => {
       // Arrange
       mockUserRepository.findByEmail.mockResolvedValue(null);
       (HashUtil.hash as jest.Mock).mockResolvedValue('hashedPassword');
-      mockUserRepository.create.mockResolvedValue({ ...mockUser, ...createUserData, password: 'hashedPassword' });
+      mockUserRepository.create.mockResolvedValue({
+        ...mockUser,
+        ...createUserData,
+        password: 'hashedPassword',
+      });
 
       // Act
       const result = await userService.create(createUserData);
@@ -218,9 +223,9 @@ describe('UserService', () => {
       mockUnitOfWork.executeInTransaction.mockImplementation(callback => callback());
 
       // Act & Assert
-      await expect(
-        userService.changePassword(1, 'wrongPassword', 'newPassword')
-      ).rejects.toThrow(ValidationError);
+      await expect(userService.changePassword(1, 'wrongPassword', 'newPassword')).rejects.toThrow(
+        ValidationError
+      );
       expect(HashUtil.hash).not.toHaveBeenCalled();
     });
   });
@@ -230,7 +235,7 @@ describe('UserService', () => {
       // Arrange
       mockUserRepository.findAll.mockResolvedValue({
         data: [],
-        meta: { page: 1, limit: 10, total: 100, totalPages: 10 }
+        meta: { page: 1, limit: 10, total: 100, totalPages: 10 },
       });
       mockUserRepository.countByRole.mockResolvedValueOnce(10); // admin count
       mockUserRepository.countByRole.mockResolvedValueOnce(90); // user count
@@ -244,8 +249,62 @@ describe('UserService', () => {
         adminCount: 10,
         userCount: 90,
       });
-          expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.ADMIN);
-    expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.USER);
+      expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.ADMIN);
+      expect(mockUserRepository.countByRole).toHaveBeenCalledWith(Role.USER);
     });
   });
-}); 
+
+  describe('findByFilter', () => {
+    const paginatedResult = {
+      data: [mockUser],
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    };
+
+    it('should filter by name (like)', async () => {
+      mockUserRepository.findByFilter.mockResolvedValue(paginatedResult);
+      const result = await userService.findByFilter({ name: 'Test' });
+      expect(mockUserRepository.findByFilter).toHaveBeenCalledWith(
+        { name: { op: 'like', value: '%Test%' } },
+        undefined
+      );
+      expect(result.data && result.data[0]?.name).toBe('Test User');
+    });
+
+    it('should filter by role', async () => {
+      mockUserRepository.findByFilter.mockResolvedValue(paginatedResult);
+      const result = await userService.findByFilter({ role: Role.USER });
+      expect(mockUserRepository.findByFilter).toHaveBeenCalledWith({ role: Role.USER }, undefined);
+      expect(result.data && result.data[0]?.role).toBe(Role.USER);
+    });
+
+    it('should filter by email (like)', async () => {
+      mockUserRepository.findByFilter.mockResolvedValue(paginatedResult);
+      const result = await userService.findByFilter({ email: 'test' });
+      expect(mockUserRepository.findByFilter).toHaveBeenCalledWith(
+        { email: { op: 'like', value: '%test%' } },
+        undefined
+      );
+      expect(result.data && result.data[0]?.email).toBe('test@example.com');
+    });
+
+    it('should filter by multiple fields', async () => {
+      mockUserRepository.findByFilter.mockResolvedValue(paginatedResult);
+      const result = await userService.findByFilter({
+        name: 'Test',
+        role: Role.USER,
+        email: 'test',
+      });
+      expect(mockUserRepository.findByFilter).toHaveBeenCalledWith(
+        {
+          name: { op: 'like', value: '%Test%' },
+          role: Role.USER,
+          email: { op: 'like', value: '%test%' },
+        },
+        undefined
+      );
+      expect(result.data && result.data[0]?.name).toBe('Test User');
+      expect(result.data && result.data[0]?.role).toBe(Role.USER);
+      expect(result.data && result.data[0]?.email).toBe('test@example.com');
+    });
+  });
+});

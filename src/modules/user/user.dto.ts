@@ -1,6 +1,6 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsIn } from 'class-validator';
-import { Transform } from 'class-transformer';
 import { Role, getRoleValues } from '@/types/role.enum';
+import { Transform } from 'class-transformer';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })
@@ -37,6 +37,23 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString({ message: 'Role must be a string' })
+  @IsIn(getRoleValues(), { message: 'Role must be either user or admin' })
+  role?: Role;
+}
+
+export class UserFilterQueryDto {
+  @IsOptional()
+  @IsString({ message: 'Name filter must be a string' })
+  @Transform(({ value }) => value?.trim())
+  name?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Email filter must be a string' })
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  email?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Role filter must be a string' })
   @IsIn(getRoleValues(), { message: 'Role must be either user or admin' })
   role?: Role;
 }

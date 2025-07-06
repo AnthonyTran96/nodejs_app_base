@@ -31,3 +31,9 @@ export interface UserResponse {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface UserFilter {
+  name?: string;
+  role?: Role;
+  email?: string;
+}

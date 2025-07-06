@@ -45,3 +45,9 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export type Constructor<T = {}> = new (...args: unknown[]) => T;
+
+// Advanced filter types for repositories
+export type FilterOperator = '=' | '!=' | '<' | '<=' | '>' | '>=' | 'like' | 'in';
+export type FilterValue = string | number | boolean | Array<string | number | boolean>;
+export type FieldFilter = { op: FilterOperator; value: FilterValue };
+export type AdvancedFilter<T> = { [K in keyof T]?: FieldFilter | FilterValue };
