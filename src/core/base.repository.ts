@@ -1,7 +1,7 @@
-import { DatabaseConnection } from '@/database/connection';
-import { QueryResult } from '@/types/database';
-import { PaginationOptions, PaginatedResult } from '@/types/common';
 import { config } from '@/config/environment';
+import { DatabaseConnection } from '@/database/connection';
+import { PaginatedResult, PaginationOptions } from '@/types/common';
+import { QueryResult } from '@/types/database';
 
 export abstract class BaseRepository<T> {
   protected readonly db: DatabaseConnection;
@@ -35,21 +35,48 @@ export abstract class BaseRepository<T> {
     return row ? this.transformDates(row) : null;
   }
 
+  // Find all records without any filter, supports pagination and sorting
   async findAll(options?: PaginationOptions): Promise<PaginatedResult<T>> {
+    return this.findByFilter({}, options);
+  }
+
+  // Find records by filters, supports pagination and sorting
+  async findByFilter(
+    filters: Partial<T> = {},
+    options?: PaginationOptions
+  ): Promise<PaginatedResult<T>> {
     let sql = `SELECT * FROM ${this.tableName}`;
     const params: unknown[] = [];
+    const filterKeys = Object.keys(filters) as (keyof T)[];
+    const filtersRecord = filters as Record<string, unknown>;
 
+    // Add WHERE clause if filters are provided
+    if (filterKeys.length > 0) {
+      const whereClauses = filterKeys.map(
+        (key, idx) => `${String(key)} = ${this.createPlaceholder(idx)}`
+      );
+      sql += ' WHERE ' + whereClauses.join(' AND ');
+      filterKeys.forEach(key => params.push(filtersRecord[String(key)]));
+    }
+
+    // Sorting
     if (options?.sortBy) {
       const order = options.sortOrder || 'ASC';
       sql += ` ORDER BY ${options.sortBy} ${order}`;
     }
 
-    // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM ${this.tableName}`;
-    const countResult = await this.db.query<{ total: number }>(countSql);
+    // Count total records (with filters)
+    let countSql = `SELECT COUNT(*) as total FROM ${this.tableName}`;
+    if (filterKeys.length > 0) {
+      const whereClauses = filterKeys.map(
+        (key, idx) => `${String(key)} = ${this.createPlaceholder(idx)}`
+      );
+      countSql += ' WHERE ' + whereClauses.join(' AND ');
+    }
+    const countResult = await this.db.query<{ total: number }>(countSql, params);
     const total = countResult.rows[0]?.total || 0;
 
-    // Apply pagination - both PostgreSQL and SQLite support LIMIT/OFFSET
+    // Pagination
     if (options?.limit && options?.page) {
       const offset = (options.page - 1) * options.limit;
       const limitPlaceholder = this.createPlaceholder(params.length);

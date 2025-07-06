@@ -1,6 +1,6 @@
 import { BaseRepository } from '@/core/base.repository';
-import { User } from '@/models/user.model';
 import { Service } from '@/core/container';
+import { User } from '@/models/user.model';
 import { Role } from '@/types/role.enum';
 
 @Service('UserRepository')
@@ -8,16 +8,13 @@ export class UserRepository extends BaseRepository<User> {
   protected readonly tableName = 'users';
 
   async findByEmail(email: string): Promise<User | null> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE email = ${this.createPlaceholder(0)} LIMIT 1`;
-    const result = await this.executeQuery<User>(sql, [email]);
-    const row = result.rows[0];
-    return row ? this.transformDates(row) : null;
+    const result = await this.findByFilter({ email });
+    return result.data[0] || null;
   }
 
   async findByRole(role: Role): Promise<User[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE role = ${this.createPlaceholder(0)}`;
-    const result = await this.executeQuery<User>(sql, [role]);
-    return result.rows.map(row => this.transformDates(row));
+    const result = await this.findByFilter({ role });
+    return result.data;
   }
 
   async emailExists(email: string, excludeId?: number): Promise<boolean> {
