@@ -1,10 +1,10 @@
-import request from 'supertest';
-import { Application } from '../../src/app';
-import { DatabaseConnection } from '@/database/connection';
 import { Container } from '@/core/container';
+import { DatabaseConnection } from '@/database/connection';
+import { Role } from '@/types/role.enum';
 import { UserRepository } from '@/user/user.repository';
 import { HashUtil } from '@/utils/hash';
-import { Role } from '@/types/role.enum';
+import request from 'supertest';
+import { Application } from '../../src/app';
 
 describe('Users E2E Tests', () => {
   let app: Application;
@@ -18,7 +18,7 @@ describe('Users E2E Tests', () => {
   beforeAll(async () => {
     app = new Application();
     await app.initialize();
-    
+
     dbConnection = DatabaseConnection.getInstance();
     container = Container.getInstance();
     userRepository = container.get<UserRepository>('UserRepository');
@@ -46,19 +46,15 @@ describe('Users E2E Tests', () => {
     testUserId = regularUser.id;
 
     // Get tokens for authentication
-    const adminLogin = await request(app.getApp())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'admin@example.com',
-        password: 'password123',
-      });
+    const adminLogin = await request(app.getApp()).post('/api/v1/auth/login').send({
+      email: 'admin@example.com',
+      password: 'password123',
+    });
 
-    const userLogin = await request(app.getApp())
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'user@example.com',
-        password: 'password123',
-      });
+    const userLogin = await request(app.getApp()).post('/api/v1/auth/login').send({
+      email: 'user@example.com',
+      password: 'password123',
+    });
 
     adminToken = adminLogin.body.data.tokens.accessToken;
     userToken = userLogin.body.data.tokens.accessToken;
@@ -78,7 +74,7 @@ describe('Users E2E Tests', () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      expect(response.body.data.users).toHaveLength(2);
+      expect(response.body.data).toHaveLength(2);
     });
 
     it('should return 403 for non-admin users', async () => {
@@ -103,7 +99,7 @@ describe('Users E2E Tests', () => {
 
       // Assert
       expect(response.body.success).toBe(true);
-      expect(response.body.data.user.id).toBe(testUserId);
+      expect(response.body.data.id).toBe(testUserId);
     });
 
     it('should allow users to get their own profile', async () => {
@@ -114,7 +110,7 @@ describe('Users E2E Tests', () => {
         .expect(200);
 
       // Assert
-      expect(response.body.data.user.id).toBe(testUserId);
+      expect(response.body.data.id).toBe(testUserId);
     });
 
     it('should return 404 for non-existent user', async () => {
@@ -128,4 +124,4 @@ describe('Users E2E Tests', () => {
       expect(response.body.success).toBe(false);
     });
   });
-}); 
+});

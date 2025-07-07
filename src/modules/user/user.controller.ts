@@ -1,9 +1,9 @@
-import { Response, NextFunction } from 'express';
-import { UserService } from '@/user/user.service';
-import { ResponseUtil } from '@/utils/response';
-import { AuthenticatedRequest } from '@/types/common';
 import { Service } from '@/core/container';
 import { NotFoundError, UnauthorizedError } from '@/middleware/error-handler';
+import { AuthenticatedRequest } from '@/types/common';
+import { UserService } from '@/user/user.service';
+import { ResponseUtil } from '@/utils/response';
+import { NextFunction, Response } from 'express';
 
 @Service('UserController')
 export class UserController {
@@ -20,11 +20,7 @@ export class UserController {
         sortOrder: sortOrder as 'ASC' | 'DESC',
       });
 
-      ResponseUtil.success(
-        res,
-        { users: result.data, meta: result.meta },
-        'Users retrieved successfully'
-      );
+      ResponseUtil.successWithPagination(res, result, 'Users retrieved successfully');
     } catch (error) {
       next(error);
     }
@@ -39,7 +35,7 @@ export class UserController {
         throw new NotFoundError('User not found');
       }
 
-      ResponseUtil.success(res, { user }, 'User retrieved successfully');
+      ResponseUtil.success(res, user, 'User retrieved successfully');
     } catch (error) {
       next(error);
     }
