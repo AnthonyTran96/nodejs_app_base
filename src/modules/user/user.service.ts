@@ -1,11 +1,11 @@
-import { UserRepository } from '@/user/user.repository';
-import { UnitOfWork } from '@/core/unit-of-work';
-import { HashUtil } from '@/utils/hash';
-import { User, CreateUserRequest, UpdateUserRequest, UserResponse } from '@/models/user.model';
-import { PaginationOptions, PaginatedResult } from '@/types/common';
-import { ValidationError, NotFoundError } from '@/middleware/error-handler';
 import { Service } from '@/core/container';
+import { UnitOfWork } from '@/core/unit-of-work';
+import { NotFoundError, ValidationError } from '@/middleware/error-handler';
+import { CreateUserRequest, UpdateUserRequest, User, UserResponse } from '@/models/user.model';
+import { PaginatedResult, PaginationOptions } from '@/types/common';
 import { Role } from '@/types/role.enum';
+import { HashUtil } from '@/utils/hash';
+import { UserRepository } from './user.repository';
 
 @Service('UserService')
 export class UserService {
