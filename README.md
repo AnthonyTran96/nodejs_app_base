@@ -17,6 +17,7 @@ Application Bootstrap
 ```
 
 ### ✨ **Module Registry Benefits:**
+
 - **🚫 Zero Conflicts**: Multiple developers can add modules without merge conflicts
 - **📦 Self-Contained**: Each module manages its own dependencies
 - **🔄 Parallel Development**: Teams work independently on separate modules
@@ -34,12 +35,16 @@ Application Bootstrap
 ✅ **Authorization** (enum-based role access control)  
 ✅ **Database Integration** (SQLite for dev, PostgreSQL for production)  
 ✅ **Repository Pattern** for data access  
+✅ **DataTransformer Utility** - Reusable data transformation logic  
+✅ **Advanced Field Mapping** - Custom column mapping with type conversion  
+✅ **Transform Functions** - Custom transformation logic for complex scenarios  
+✅ **Comprehensive Type System** - 15+ field types with automatic conversion  
 ✅ **Unit of Work** pattern for transactions  
 ✅ **Database Migrations** with versioning system  
 ✅ **Comprehensive Testing** (Unit, Integration, E2E)  
 ✅ **Code Quality** (ESLint + Prettier)  
 ✅ **Logging** with Winston  
-✅ **Environment Configuration** with validation  
+✅ **Environment Configuration** with validation
 
 ## 📁 Project Structure
 
@@ -68,8 +73,13 @@ src/
 ├── types/              # TypeScript type definitions
 │   ├── role.enum.ts    # 🎭 Role enum & type definitions
 │   ├── common.ts       # Common interfaces and types
-│   └── database.ts     # Database-related types
+│   ├── database.ts     # Database-related types
+│   ├── filter.ts       # Advanced filtering types
+│   └── repository.ts   # Repository schema & type definitions
 ├── utils/              # Utility functions
+│   ├── data-transformer.ts # 🔄 Reusable data transformation logic
+│   ├── query-builder.ts    # SQL query building utilities
+│   └── ...                 # Other utility functions
 ├── modules/            # 📦 Feature modules (self-registering)
 │   ├── auth/           # Authentication module
 │   │   ├── auth.controller.ts
@@ -100,16 +110,18 @@ docs/
 This project uses a **Module Registry Pattern** that eliminates merge conflicts when multiple developers add services:
 
 ### ✅ **How it works:**
+
 1. Each module creates a `*.registry.ts` file that self-registers its services
 2. `container-setup.ts` just imports the registry files
 3. **No more conflicts!** Each developer only adds 1 line per module
 
 ### 🚀 **Adding a new module:**
+
 ```typescript
 // 1. Create registry file: src/modules/post/post.registry.ts
 ModuleRegistry.registerModule({
   name: 'PostModule',
-  register: async (container) => {
+  register: async container => {
     // Import and register module services
     const { PostService } = await import('./post.service');
     container.register('PostService', PostService);
@@ -147,19 +159,22 @@ if (user.role === Role.ADMIN) {
 ```
 
 ### ✅ **Benefits:**
+
 - ✅ **Compile-time checking** prevents invalid roles
-- ✅ **IDE autocomplete** for role values  
+- ✅ **IDE autocomplete** for role values
 - ✅ **Single source of truth** for all roles
 - ✅ **Refactor-safe** - renaming updates everywhere
 
 ## 🗄️ Database Support
 
 ### Development
+
 - **SQLite**: Automatic setup, file-based database
 - **Auto-migrations**: Runs automatically on startup
 - **Sample data**: Seeding with realistic test data
 
 ### Production
+
 - **PostgreSQL**: Recommended for production use
 - **Connection pooling**: Optimized for concurrent requests
 - **Migration control**: Manual migration approval for safety
@@ -167,11 +182,13 @@ if (user.role === Role.ADMIN) {
 ## 🚀 Quick Start
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Environment Setup
+
 ```bash
 # Copy environment template
 cp .env.example .env
@@ -181,6 +198,7 @@ cp .env.example .env
 ```
 
 Basic development configuration:
+
 ```env
 NODE_ENV=development
 PORT=3000
@@ -192,11 +210,13 @@ COOKIE_SECRET=your-development-cookie-secret-32-chars
 ```
 
 ### 3. Build the Project
+
 ```bash
 npm run build
 ```
 
 ### 4. Start Development Server
+
 ```bash
 npm run dev
 ```
@@ -206,11 +226,13 @@ The server starts on `http://localhost:3000`
 ## 📚 API Endpoints
 
 ### Health Check
+
 ```bash
 GET /health
 ```
 
 ### Authentication
+
 ```bash
 POST /api/v1/auth/register    # Register new user
 POST /api/v1/auth/login       # Login
@@ -220,6 +242,7 @@ GET  /api/v1/auth/profile     # Get current user profile
 ```
 
 ### Users (Authentication Required)
+
 ```bash
 GET    /api/v1/users          # List users (admin only)
 GET    /api/v1/users/:id      # Get user by ID
@@ -231,6 +254,7 @@ GET    /api/v1/users/stats    # User statistics (admin only)
 ```
 
 ### API Documentation
+
 ```bash
 GET /api/v1/docs              # API documentation
 ```
@@ -259,6 +283,7 @@ npm run test:watch
 ## 🔧 Development
 
 ### Code Quality
+
 ```bash
 # Lint code
 npm run lint
@@ -274,6 +299,7 @@ npm run check
 ```
 
 ### Build & TypeScript
+
 ```bash
 # Build for production
 npm run build
@@ -283,6 +309,7 @@ npx tsc --noEmit
 ```
 
 ### Database Management
+
 ```bash
 # Run migrations
 npm run db:migrate
@@ -311,11 +338,13 @@ npm run db:seed
 ## 📖 Documentation
 
 ### 📚 **Complete Guides:**
+
 - **[docs/ONBOARDING.md](docs/ONBOARDING.md)** - Complete development guide with module creation, role system, testing strategies
 - **[docs/DATABASE_MIGRATION_GUIDE.md](docs/DATABASE_MIGRATION_GUIDE.md)** - Database migration system, PostgreSQL/SQLite setup
 - **[docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md)** - Environment configuration, validation rules, troubleshooting
 
 ### 🎯 **What each guide covers:**
+
 - **ONBOARDING**: Architecture, adding modules, testing, debugging
 - **DATABASE_MIGRATION**: Migrations, seeds, PostgreSQL setup
 - **ENVIRONMENT_SETUP**: Configuration for dev/test/production
@@ -323,6 +352,7 @@ npm run db:seed
 ## 🌟 Key Components
 
 ### Module Registry Pattern
+
 Self-registering modules eliminate conflicts:
 
 ```typescript
@@ -339,6 +369,7 @@ ModuleRegistry.registerModule({
 ```
 
 ### Container Setup (Minimal)
+
 ```typescript
 // src/core/container-setup.ts
 export class ContainerSetup {
@@ -351,6 +382,7 @@ export class ContainerSetup {
 ```
 
 ### Service Registration
+
 ```typescript
 @Service('UserService')
 export class UserService {
@@ -359,6 +391,7 @@ export class UserService {
 ```
 
 ### Validation with Role Enums
+
 Request validation with decorators and enum validation:
 
 ```typescript
@@ -373,14 +406,15 @@ export class CreateUserDto {
   password!: string;
 
   @IsOptional()
-  @IsEnum(Role, { 
-    message: `Role must be one of: ${getRoleValues().join(', ')}` 
+  @IsEnum(Role, {
+    message: `Role must be one of: ${getRoleValues().join(', ')}`,
   })
   role?: Role = Role.USER; // Type-safe default
 }
 ```
 
 ### Database-Agnostic Repositories
+
 Support for both SQLite and PostgreSQL:
 
 ```typescript
@@ -396,7 +430,43 @@ export class BaseRepository<T> {
 }
 ```
 
+### DataTransformer Utility
+
+Reusable data transformation logic for complex queries:
+
+```typescript
+// For complex JOIN queries with custom field mappings
+const postSchema: RepositorySchema<Post> = {
+  id: { column: 'post_id', type: 'integer' },
+  title: { column: 'post_title', type: 'string' },
+  published: { column: 'post_published', type: 'boolean' },
+  createdAt: { column: 'post_created_at', type: 'date' },
+};
+
+const authorSchema: RepositorySchema<User> = {
+  id: { column: 'author_id', type: 'integer' },
+  name: { column: 'author_name', type: 'string' },
+  password: { transform: () => '' }, // Hide sensitive data
+};
+
+// Transform raw query results
+const transformedData = result.rows.map(row => {
+  const post = DataTransformer.transformRow<Post>(row, postSchema);
+  const author = DataTransformer.transformRow<User>(row, authorSchema);
+  return { ...post, author };
+});
+```
+
+**Features:**
+
+- ✅ **15+ Field Types**: String, number, boolean, date, JSON, array, enum, etc.
+- ✅ **Custom Column Mapping**: Map database columns to model fields
+- ✅ **Transform Functions**: Custom transformation logic for specific fields
+- ✅ **Type Safety**: Full TypeScript support with generic types
+- ✅ **Automatic Conversion**: Built-in type conversion (string to number, boolean, etc.)
+
 ### Path Aliases
+
 Clean imports with TypeScript path mapping:
 
 ```typescript
@@ -408,15 +478,16 @@ import { logger } from '@/utils/logger';
 ```
 
 ### Application Flow
+
 ```typescript
 // src/app.ts
 export class Application {
   async initialize(): Promise<void> {
-    await this.setupDatabase();           // ✅ Database connection + migrations
-    this.setupMiddleware();               // ✅ Express middleware
+    await this.setupDatabase(); // ✅ Database connection + migrations
+    this.setupMiddleware(); // ✅ Express middleware
     await this.containerSetup.setupDependencies(); // ✅ Module registry + DI
-    this.setupRoutes();                   // ✅ Routes initialization
-    this.setupErrorHandling();            // ✅ Error handling
+    this.setupRoutes(); // ✅ Routes initialization
+    this.setupErrorHandling(); // ✅ Error handling
   }
 
   private setupRoutes(): void {
@@ -434,6 +505,7 @@ export class Application {
 ```
 
 ### Response Format
+
 Standardized API responses:
 
 ```typescript
@@ -472,7 +544,7 @@ Standardized API responses:
 ✅ **Documentation**: Comprehensive guides available  
 ✅ **PostgreSQL Support**: Production-ready database setup  
 ✅ **Environment Validation**: Safe configuration management  
-✅ **Centralized Routes**: All routes organized in src/routes/  
+✅ **Centralized Routes**: All routes organized in src/routes/
 
 ## 🤝 Contributing
 
@@ -486,6 +558,7 @@ Standardized API responses:
 8. Ensure all checks pass (`npm run check`)
 
 ### 🚀 **Adding New Modules:**
+
 ```bash
 # 1. Copy template
 cp src/core/template.registry.ts.example src/modules/your-module/your-module.registry.ts
@@ -507,4 +580,4 @@ MIT License - see LICENSE file for details.
 
 **Ready for conflict-free development!** 🎉
 
-Multiple developers can now work in parallel without merge conflicts using the **Module Registry Pattern** and **Centralized Routes**. 
+Multiple developers can now work in parallel without merge conflicts using the **Module Registry Pattern** and **Centralized Routes**.

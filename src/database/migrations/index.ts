@@ -1,11 +1,13 @@
 import { DatabaseConnection } from '@/database/connection';
-import { MigrationManager } from './migration-manager';
-import { CreateUsersTableMigration } from './001_create_users_table';
 import { logger } from '@/utils/logger';
+import { CreateUsersTableMigration } from './001_create_users_table';
+import { CreatePostsTableMigration } from './002_create_posts_table';
+import { MigrationManager } from './migration-manager';
 
 // Register all migrations here
 export function registerMigrations(migrationManager: MigrationManager): void {
   migrationManager.registerMigration(new CreateUsersTableMigration());
+  migrationManager.registerMigration(new CreatePostsTableMigration());
 
   // Add future migrations here:
   // migrationManager.registerMigration(new NextMigration());

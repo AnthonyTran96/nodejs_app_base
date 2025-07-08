@@ -1,24 +1,30 @@
 import { BaseRepository } from '@/core/base.repository';
 import { Service } from '@/core/container';
 import { User } from '@/models/user.model';
+import { RepositorySchema } from '@/types/repository';
 import { Role } from '@/types/role.enum';
 import { QueryBuilder } from '@/utils/query-builder';
 
 @Service('UserRepository')
 export class UserRepository extends BaseRepository<User> {
   protected readonly tableName = 'users';
+  protected override readonly schema: RepositorySchema<User> = {
+    createdAt: 'date', // auto-mapped to created_at
+    updatedAt: 'date', // auto-mapped to updated_at
+    role: { type: 'enum', enumType: Role },
+  };
 
   async findByEmail(email: string): Promise<User | null> {
     const sql = `SELECT * FROM ${this.tableName} WHERE email = ${QueryBuilder.createPlaceholder(0)} LIMIT 1`;
     const result = await this.executeQuery<User>(sql, [email]);
     const row = result.rows[0];
-    return row ? this.transformDates(row) : null;
+    return row ? this.transformRow(row) : null;
   }
 
   async findByRole(role: Role): Promise<User[]> {
     const sql = `SELECT * FROM ${this.tableName} WHERE role = ${QueryBuilder.createPlaceholder(0)}`;
     const result = await this.executeQuery<User>(sql, [role]);
-    return result.rows.map(row => this.transformDates(row));
+    return result.rows.map(row => this.transformRow(row));
   }
 
   async emailExists(email: string, excludeId?: number): Promise<boolean> {

@@ -1,10 +1,5 @@
 import { config } from '@/config/environment';
-import { AdvancedFilter, FilterOperator } from '@/types/common';
-
-interface FilterOptions {
-  tableAlias?: string;
-  filterMapping?: Record<string, { tableAlias: string; column: string }>;
-}
+import { AdvancedFilter, FilterOperator, FilterOptions } from '@/types/filter';
 
 export class QueryBuilder {
   static createPlaceholder(index: number): string {
