@@ -1,12 +1,15 @@
 import { config } from '@/config/environment';
 import { DatabaseConnection } from '@/database/connection';
-import { AdvancedFilter, PaginatedResult, PaginationOptions } from '@/types/common';
+import { PaginatedResult, PaginationOptions } from '@/types/common';
 import { QueryResult } from '@/types/database';
+import { AdvancedFilter } from '@/types/filter';
+import { RepositorySchema } from '@/types/repository';
 import { QueryBuilder } from '@/utils/query-builder';
 
 export abstract class BaseRepository<T> {
   protected readonly db: DatabaseConnection;
   protected abstract readonly tableName: string;
+  protected readonly schema: RepositorySchema<T> = {};
 
   constructor() {
     this.db = DatabaseConnection.getInstance();
@@ -16,7 +19,7 @@ export abstract class BaseRepository<T> {
     const sql = `SELECT * FROM ${this.tableName} WHERE id = ${QueryBuilder.createPlaceholder(0)} LIMIT 1`;
     const result = await this.db.query<T>(sql, [id]);
     const row = result.rows[0];
-    return row ? this.transformDates(row) : null;
+    return row ? this.transformRow(row) : null;
   }
 
   // Find all records without any filter, supports pagination and sorting
@@ -31,8 +34,9 @@ export abstract class BaseRepository<T> {
   ): Promise<PaginatedResult<T>> {
     let sql = `SELECT * FROM ${this.tableName}`;
 
-    // Use QueryBuilder for filter processing
-    const { where, params } = QueryBuilder.buildFilterWhereClause(filters);
+    // Use QueryBuilder for filter processing, after transforming filter keys to snake_case
+    const snakeCaseFilters = this.transformInputData(filters);
+    const { where, params } = QueryBuilder.buildFilterWhereClause(snakeCaseFilters);
 
     if (where) {
       sql += ' WHERE ' + where;
@@ -65,7 +69,7 @@ export abstract class BaseRepository<T> {
     const result = await this.db.query<T>(sql, params);
 
     return {
-      data: result.rows.map(row => this.transformDates(row)),
+      data: result.rows.map(row => this.transformRow(row)),
       meta: {
         page: options?.page || 1,
         limit: options?.limit || result.rows.length,
@@ -76,8 +80,9 @@ export abstract class BaseRepository<T> {
   }
 
   async create(data: Partial<T>): Promise<T> {
-    const fields = Object.keys(data).filter(key => data[key as keyof T] !== undefined);
-    const values = fields.map(key => data[key as keyof T]);
+    const dbData = this.transformInputData(data);
+    const fields = Object.keys(dbData).filter(key => (dbData as any)[key] !== undefined);
+    const values = fields.map(key => (dbData as any)[key]);
 
     if (config.database.type === 'postgresql') {
       // PostgreSQL: Use $1, $2, $3 placeholders and RETURNING clause
@@ -130,7 +135,8 @@ export abstract class BaseRepository<T> {
   }
 
   async update(id: number, data: Partial<T>): Promise<T | null> {
-    const fields = Object.keys(data).filter(key => data[key as keyof T] !== undefined);
+    const dbData = this.transformInputData(data);
+    const fields = Object.keys(dbData).filter(key => (dbData as any)[key] !== undefined);
     if (fields.length === 0) {
       throw new Error('No data provided for update');
     }
@@ -138,7 +144,7 @@ export abstract class BaseRepository<T> {
     const setClause = fields
       .map((field, index) => `${field} = ${QueryBuilder.createPlaceholder(index)}`)
       .join(', ');
-    const values = fields.map(key => data[key as keyof T]);
+    const values = fields.map(key => (dbData as any)[key]);
 
     const sql = `
       UPDATE ${this.tableName}
@@ -165,26 +171,6 @@ export abstract class BaseRepository<T> {
     return result.rows.length > 0;
   }
 
-  protected async executeQuery<TResult = T>(
-    sql: string,
-    params: unknown[] = []
-  ): Promise<QueryResult<TResult>> {
-    return this.db.query<TResult>(sql, params);
-  }
-
-  protected transformDates(record: any): T {
-    // Transform string dates to Date objects
-    if (record.created_at && typeof record.created_at === 'string') {
-      record.createdAt = new Date(record.created_at);
-      delete record.created_at;
-    }
-    if (record.updated_at && typeof record.updated_at === 'string') {
-      record.updatedAt = new Date(record.updated_at);
-      delete record.updated_at;
-    }
-    return record as T;
-  }
-
   private getLastInsertIdSql(): string {
     // This varies by database type
     if (config.database.type === 'postgresql') {
@@ -192,5 +178,88 @@ export abstract class BaseRepository<T> {
     } else {
       return 'SELECT last_insert_rowid() as id'; // SQLite
     }
+  }
+
+  protected async executeQuery<TResult = T>(
+    sql: string,
+    params: unknown[] = []
+  ): Promise<QueryResult<TResult>> {
+    return this.db.query<TResult>(sql, params);
+  }
+
+  protected transformRow(row: any): T {
+    if (!row) {
+      return row;
+    }
+
+    const transformed: { [key: string]: any } = {};
+
+    // 1. Convert snake_case to camelCase
+    for (const key in row) {
+      if (Object.prototype.hasOwnProperty.call(row, key)) {
+        const camelCaseKey = key.replace(/_([a-z])/g, g => (g[1] ? g[1].toUpperCase() : ''));
+        transformed[camelCaseKey] = row[key];
+      }
+    }
+
+    // 2. Apply type transformations based on schema
+    for (const key in this.schema) {
+      if (Object.prototype.hasOwnProperty.call(transformed, key)) {
+        const fieldType = this.schema[key as keyof T];
+        const originalValue = transformed[key];
+
+        if (originalValue === null || originalValue === undefined) {
+          continue;
+        }
+
+        switch (fieldType) {
+          case 'boolean':
+            transformed[key] = Boolean(originalValue);
+            break;
+          case 'number':
+            transformed[key] = parseFloat(originalValue);
+            break;
+          case 'date':
+            transformed[key] = new Date(originalValue);
+            break;
+          case 'json':
+          case 'array':
+            if (typeof originalValue === 'string') {
+              try {
+                transformed[key] = JSON.parse(originalValue);
+              } catch (e) {
+                console.error(`Failed to parse JSON/Array for key '${key}':`, originalValue);
+              }
+            }
+            break;
+          case 'bigint':
+            try {
+              transformed[key] = BigInt(originalValue);
+            } catch (e) {
+              console.error(`Failed to convert to BigInt for key '${key}':`, originalValue);
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    return transformed as T;
+  }
+
+  protected transformInputData(data: any): any {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return data;
+    }
+
+    const snakeCaseData: { [key: string]: any } = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const snakeCaseKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        snakeCaseData[snakeCaseKey] = data[key];
+      }
+    }
+    return snakeCaseData;
   }
 }

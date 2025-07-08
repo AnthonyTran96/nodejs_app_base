@@ -17,6 +17,7 @@ Controllers → Services → Unit of Work → Repositories → Database
 ```
 
 ### Dependency Flow:
+
 1. **Application** initializes database and security middleware
 2. **Security Layer** sanitizes input and enforces security policies
 3. **ContainerSetup** registers all services and dependencies
@@ -53,9 +54,11 @@ src/
 │   ├── user.routes.ts  # User management routes
 │   └── README.md       # Routes documentation & guidelines
 ├── types/              # TypeScript type definitions
-│   ├── role.enum.ts    # 🎭 Role enum and type definitions
-│   ├── common.ts       # Common interfaces and types
-│   └── database.ts     # Database-related types
+│   ├── role.enum.ts    # 🎭 Role enum
+│   ├── common.ts       # Common interfaces (pagination, etc.)
+│   ├── database.ts     # Core database connection types
+│   ├── filter.ts       # 🆕 Advanced filtering types
+│   └── repository.ts   # 🆕 Repository schema & type definitions
 ├── utils/              # Utility functions (logger, response, hash)
 ├── modules/            # 📦 Feature modules
 │   ├── auth/           # Authentication module
@@ -90,6 +93,7 @@ docs/
 This project implements **defense-in-depth security** with multiple layers of protection:
 
 ### Security Layers:
+
 1. **Input Sanitization** - XSS prevention on all user inputs
 2. **Input Validation** - Schema validation with class-validator
 3. **Authentication** - JWT-based authentication system
@@ -110,14 +114,16 @@ Automatically removes dangerous HTML/JavaScript content from user inputs:
 import { SanitizeUserInput, SanitizeContentInput } from '@/middleware/sanitization.middleware';
 
 // Apply to routes that handle user input
-router.post('/register', 
-  SanitizeUserInput(),      // 🛡️ Sanitize first
+router.post(
+  '/register',
+  SanitizeUserInput(), // 🛡️ Sanitize first
   ValidateBody(CreateUserDto), // Then validate
   authController.register
 );
 ```
 
 **Protection Features:**
+
 - ✅ Removes `<script>` tags and JavaScript
 - ✅ Strips dangerous HTML tags (`iframe`, `object`, etc.)
 - ✅ Eliminates event handlers (`onclick`, `onload`)
@@ -126,19 +132,20 @@ router.post('/register',
 - ✅ Configurable field targeting
 
 **Usage Examples:**
+
 ```typescript
 // For user data (name, email, bio)
-SanitizeUserInput()
+SanitizeUserInput();
 
 // For content that allows basic HTML
-SanitizeContentInput()
+SanitizeContentInput();
 
 // Custom field targeting
 SanitizeInput({
   fields: ['name', 'description'],
   allowBasicHtml: false,
-  logSanitization: true
-})
+  logSanitization: true,
+});
 ```
 
 ### Enhanced Security Headers
@@ -227,7 +234,7 @@ import { AuthGuard, authorize } from '@/middleware/auth.middleware';
 // Single role authorization
 router.delete('/:id', authorize([Role.ADMIN]), deleteHandler);
 
-// Multiple roles authorization  
+// Multiple roles authorization
 router.get('/dashboard', authorize([Role.ADMIN, Role.USER]), dashboardHandler);
 
 // In controller methods
@@ -258,6 +265,7 @@ cp .env.example .env
 ```
 
 Basic `.env` configuration:
+
 ```env
 NODE_ENV=development
 PORT=3000
@@ -294,32 +302,38 @@ The server will start on `http://localhost:3000`
 // src/app.ts - Clean application setup with security
 export class Application {
   async initialize(): Promise<void> {
-    await this.setupDatabase();           // 1. Setup database
-    this.setupMiddleware();               // 2. Setup security & middleware
+    await this.setupDatabase(); // 1. Setup database
+    this.setupMiddleware(); // 2. Setup security & middleware
     await this.containerSetup.setupDependencies(); // 3. Register all services
-    this.setupRoutes();                   // 4. Mount routes
-    this.setupErrorHandling();            // 5. Setup error handling
+    this.setupRoutes(); // 4. Mount routes
+    this.setupErrorHandling(); // 5. Setup error handling
   }
 
   private setupMiddleware(): void {
     // Security headers
-    this.app.use(helmet({ /* enhanced config */ }));
-    
+    this.app.use(
+      helmet({
+        /* enhanced config */
+      })
+    );
+
     // CORS with environment-aware origins
-    this.app.use(cors({ 
-      origin: config.allowedOrigins,  // Dynamic based on environment
-      credentials: true 
-    }));
-    
+    this.app.use(
+      cors({
+        origin: config.allowedOrigins, // Dynamic based on environment
+        credentials: true,
+      })
+    );
+
     // Request size limits (1MB)
     this.app.use(express.json({ limit: '1mb' }));
-    
+
     // Request size error handling
     this.app.use((error, req, res, next) => {
       if (error?.type === 'entity.too.large') {
         return res.status(413).json({
           success: false,
-          message: 'Request payload too large. Maximum size allowed is 1MB.'
+          message: 'Request payload too large. Maximum size allowed is 1MB.',
         });
       }
       next(error);
@@ -336,13 +350,13 @@ export class ContainerSetup {
   async setupDependencies(): Promise<void> {
     // 1. Load all module registries (auto-registers)
     await this.loadModules();
-    
+
     // 2. Initialize all registered modules
     await ModuleRegistry.initializeAllModules(this.container);
-    
+
     // 3. Initialize container
     await this.container.initialize();
-    
+
     // 4. Initialize routes
     initializeRoutes();
   }
@@ -362,12 +376,14 @@ export class ContainerSetup {
 This project uses a **Module Registry Pattern** to eliminate merge conflicts when multiple developers add services.
 
 ### ✅ Benefits:
+
 - **Parallel Development**: Each developer works on separate modules
 - **Minimal Conflicts**: Only need to add 1 line per new module
 - **Clear Ownership**: Each module manages its own dependencies
 - **Type Safety**: Full TypeScript support
 
 ### 🎯 How it works:
+
 1. Each module creates a `*.registry.ts` file
 2. The registry file self-registers all module services
 3. `container-setup.ts` just imports the registry files
@@ -429,12 +445,12 @@ import { IsNotEmpty, IsString, IsOptional, IsBoolean, MaxLength } from 'class-va
 export class CreatePostDto {
   @IsNotEmpty()
   @IsString()
-  @MaxLength(255)  // 🔒 Prevent excessively long titles
+  @MaxLength(255) // 🔒 Prevent excessively long titles
   title!: string;
 
   @IsNotEmpty()
   @IsString()
-  @MaxLength(50000)  // 🔒 Reasonable content limit
+  @MaxLength(50000) // 🔒 Reasonable content limit
   content!: string;
 
   @IsOptional()
@@ -459,28 +475,50 @@ export class UpdatePostDto {
 }
 ```
 
-### 4. Create Repository
+### 4. Create Repository (with Automatic Data Transformation)
+
+The `BaseRepository` provides powerful, automatic data transformation. You only need to define a `schema` to tell it how to handle data types.
+
+**Key Features:**
+
+- **`transformRow`**: Automatically transforms data read from the database (e.g., SQLite `1`/`0` to `boolean`, date `string` to `Date` object).
+- **`transformInputData`**: Automatically transforms data being written to the database (e.g., `camelCase` from your code to `snake_case` for SQL columns), including in filters.
+
+This keeps your repository code clean, declarative, and database-agnostic.
 
 ```typescript
 // src/modules/post/post.repository.ts
 import { BaseRepository } from '@/core/base.repository';
-import { Post } from '@/models/post.model';
+import { Post, CreatePostRequest } from '@/models/post.model';
 import { Service } from '@/core/container';
+import { RepositorySchema } from '@/types/repository';
 
 @Service('PostRepository')
 export class PostRepository extends BaseRepository<Post> {
   protected readonly tableName = 'posts';
 
-  async findByAuthor(authorId: number): Promise<Post[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE authorId = ${this.createPlaceholder(0)}`;
-    const result = await this.executeQuery<Post>(sql, [authorId]);
-    return result.rows.map(row => this.transformDates(row));
+  // 🎯 Define the transformation schema.
+  // This tells BaseRepository how to convert data types automatically.
+  protected override readonly schema: RepositorySchema<Post> = {
+    published: 'boolean',
+    createdAt: 'date',
+    updatedAt: 'date',
+  };
+
+  // ✅ The 'create' method is overridden for TYPE SAFETY.
+  // It ensures services must provide a valid 'CreatePostRequest'.
+  // The actual logic (incl. camelCase -> snake_case) is handled by BaseRepository.
+  override async create(data: CreatePostRequest): Promise<Post> {
+    return super.create(data);
   }
 
-  async findPublished(): Promise<Post[]> {
-    const sql = `SELECT * FROM ${this.tableName} WHERE published = true`;
-    const result = await this.executeQuery<Post>(sql);
-    return result.rows.map(row => this.transformDates(row));
+  // Example of a custom method using the powerful findByFilter.
+  // Note: No manual data transformation is needed!
+  // `transformInputData` handles the filter keys (authorId -> author_id)
+  // `transformRow` handles the output data.
+  async findByAuthor(authorId: number): Promise<Post[]> {
+    const result = await this.findByFilter({ authorId });
+    return result.data;
   }
 }
 ```
@@ -561,7 +599,7 @@ export class PostController {
   async getPosts(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { page, limit, sortBy, sortOrder } = req.query;
-      
+
       const result = await this.postService.findAll({
         page: page ? Number(page) : 1,
         limit: limit ? Number(limit) : 10,
@@ -591,10 +629,10 @@ ModuleRegistry.registerModule({
     const { PostRepository } = await import('@/modules/post/post.repository');
     const { PostService } = await import('@/modules/post/post.service');
     const { PostController } = await import('@/modules/post/post.controller');
-    
+
     // Register services with dependencies
     container.register('PostRepository', PostRepository);
-    
+
     container.register('PostService', PostService, {
       dependencies: ['PostRepository', 'UnitOfWork'],
     });
@@ -625,7 +663,7 @@ private async loadModules(): Promise<void> {
 import { Router } from 'express';
 import { PostController } from '@/modules/post/post.controller';
 import { ValidateBody, ValidateParams, ValidateQuery } from '@/middleware/validation.middleware';
-import { SanitizeContentInput } from '@/middleware/sanitization.middleware';  // 🆕 Security
+import { SanitizeContentInput } from '@/middleware/sanitization.middleware'; // 🆕 Security
 import { AuthGuard, authorize } from '@/middleware/auth.middleware';
 import { CreatePostDto, UpdatePostDto } from '@/modules/post/post.dto';
 import { IdParamDto, PaginationDto } from '@/types/common.dto';
@@ -637,30 +675,26 @@ export function createPostRoutes(postController: PostController): Router {
   // All routes require authentication
   router.use(AuthGuard);
 
-  router.get(
-    '/',
-    ValidateQuery(PaginationDto),
-    postController.getPosts.bind(postController)
-  );
+  router.get('/', ValidateQuery(PaginationDto), postController.getPosts.bind(postController));
 
   router.post(
     '/',
-    SanitizeContentInput(),        // 🛡️ Sanitize first (allows basic HTML in content)
-    ValidateBody(CreatePostDto),   // Then validate
+    SanitizeContentInput(), // 🛡️ Sanitize first (allows basic HTML in content)
+    ValidateBody(CreatePostDto), // Then validate
     postController.createPost.bind(postController)
   );
 
   router.put(
     '/:id',
     ValidateParams(IdParamDto),
-    SanitizeContentInput(),        // 🛡️ Sanitize updates too
+    SanitizeContentInput(), // 🛡️ Sanitize updates too
     ValidateBody(UpdatePostDto),
     postController.updatePost.bind(postController)
   );
 
   router.delete(
     '/:id',
-    authorize([Role.ADMIN]),       // 🔒 Only admins can delete
+    authorize([Role.ADMIN]), // 🔒 Only admins can delete
     ValidateParams(IdParamDto),
     postController.deletePost.bind(postController)
   );
@@ -696,10 +730,12 @@ export function initializeRoutes(): Router {
 ## 🗄️ Database Management
 
 ### Database Support
+
 - **Development**: SQLite (automatic setup)
 - **Production**: PostgreSQL (recommended)
 
 ### Migration System
+
 ```bash
 # Run migrations (automatically on startup)
 npm run db:migrate
@@ -716,6 +752,7 @@ See `docs/DATABASE_MIGRATION_GUIDE.md` for detailed database management.
 ## 🧪 Testing Strategy
 
 ### Security Testing
+
 Test security measures are in place:
 
 ```bash
@@ -725,12 +762,15 @@ reports/security-testing/security-fixes-verification-report.md
 ```
 
 ### Unit Tests
+
 Test services in isolation with mocked dependencies.
 
 ### Integration Tests
+
 Test repository interactions with the database.
 
 ### E2E Tests
+
 Test complete API workflows.
 
 ```bash
@@ -754,16 +794,18 @@ import { SanitizeUserInput, SanitizeContentInput } from '@/middleware/sanitizati
 import { Role } from '@/types/role.enum';
 
 // In route definitions - Security Layer Order:
-router.post('/',
-  SanitizeUserInput(),              // 1. 🛡️ Sanitize dangerous input
-  ValidateBody(CreateDto),          // 2. ✅ Validate schema
-  AuthGuard,                        // 3. 🔒 Require authentication
-  authorize([Role.ADMIN]),          // 4. 👮 Check authorization
-  controller.create                 // 5. 🎯 Execute business logic
+router.post(
+  '/',
+  SanitizeUserInput(), // 1. 🛡️ Sanitize dangerous input
+  ValidateBody(CreateDto), // 2. ✅ Validate schema
+  AuthGuard, // 3. 🔒 Require authentication
+  authorize([Role.ADMIN]), // 4. 👮 Check authorization
+  controller.create // 5. 🎯 Execute business logic
 );
 
 // Multiple roles
-router.get('/dashboard', 
+router.get(
+  '/dashboard',
   AuthGuard,
   authorize([Role.ADMIN, Role.USER]), // Admin or User access
   controller.dashboard
@@ -778,14 +820,14 @@ import { Role } from '@/types/role.enum';
 async createPost(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = req.user?.userId;  // Available after AuthGuard
   const userRole = req.user?.role;  // User role for authorization (type: Role)
-  
+
   // Type-safe role checking
   if (userRole === Role.ADMIN) {
     // Admin-specific logic
   } else if (userRole === Role.USER) {
     // User-specific logic
   }
-  
+
   const postData = { ...req.body, authorId: userId };
   // Note: req.body is already sanitized by SanitizeInput middleware
 }
@@ -796,32 +838,39 @@ async createPost(req: AuthenticatedRequest, res: Response): Promise<void> {
 Use class-validator decorators with security considerations:
 
 ```typescript
-import { 
-  IsEmail, IsNotEmpty, MinLength, IsOptional, IsBoolean, IsEnum,
-  MaxLength, IsAlphanumeric, Matches 
+import {
+  IsEmail,
+  IsNotEmpty,
+  MinLength,
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+  MaxLength,
+  IsAlphanumeric,
+  Matches,
 } from 'class-validator';
 import { Role, getRoleValues } from '@/types/role.enum';
 
 export class CreateUserDto {
   @IsNotEmpty()
   @IsEmail()
-  @MaxLength(255)  // 🔒 Prevent excessively long emails
+  @MaxLength(255) // 🔒 Prevent excessively long emails
   email!: string;
 
   @IsNotEmpty()
   @MinLength(8)
-  @MaxLength(128)  // 🔒 Reasonable password limit
+  @MaxLength(128) // 🔒 Reasonable password limit
   // @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, { message: 'Password too weak' })  // Optional strength
   password!: string;
 
   @IsNotEmpty()
   @IsString()
-  @MaxLength(100)  // 🔒 Prevent excessively long names
-  name!: string;   // Will be sanitized by SanitizeUserInput middleware
+  @MaxLength(100) // 🔒 Prevent excessively long names
+  name!: string; // Will be sanitized by SanitizeUserInput middleware
 
   @IsOptional()
-  @IsEnum(Role, { 
-    message: `Role must be one of: ${getRoleValues().join(', ')}` 
+  @IsEnum(Role, {
+    message: `Role must be one of: ${getRoleValues().join(', ')}`,
   })
   role?: Role = Role.USER; // Default to USER role
 }
@@ -840,7 +889,7 @@ import { ResponseUtil } from '@/utils/response';
 ResponseUtil.success(res, data, 'Success message');
 ResponseUtil.success(res, data, 'Created successfully', 201);
 
-// Paginated responses  
+// Paginated responses
 ResponseUtil.successWithPagination(res, paginatedResult);
 
 // Error responses
@@ -857,11 +906,11 @@ import { logger } from '@/utils/logger';
 
 // Security events are automatically logged by middleware
 // Manual security logging:
-logger.warn('Suspicious activity detected', { 
-  userId, 
-  ip: req.ip, 
+logger.warn('Suspicious activity detected', {
+  userId,
+  ip: req.ip,
   userAgent: req.get('user-agent'),
-  action: 'multiple_failed_attempts'
+  action: 'multiple_failed_attempts',
 });
 
 logger.info('Operation completed', { userId, postId });
@@ -872,12 +921,14 @@ logger.debug('Debug information', { data });
 ## 🔒 Security Best Practices
 
 ### 1. Input Security
+
 - ✅ **Always sanitize** user input using `SanitizeUserInput()` or `SanitizeContentInput()`
 - ✅ **Validate after sanitization** using DTOs and class-validator
 - ✅ **Set maximum lengths** to prevent buffer overflow attacks
 - ✅ **Use enum validation** for constrained values like roles
 
 ### 2. Route Security
+
 - ✅ **Apply middleware in order**: Sanitize → Validate → Authenticate → Authorize
 - ✅ **Use parameterized queries** (automatically handled by repositories)
 - ✅ **Implement proper authentication** with JWT tokens
@@ -899,12 +950,14 @@ if (isValidRole(inputRole)) {
 }
 
 // ❌ Bad: Using string literals
-if (user.role === 'admin') { // No type safety
+if (user.role === 'admin') {
+  // No type safety
   // Admin logic
 }
 ```
 
 ### 4. Environment Security
+
 - ✅ **Use proper environment configuration** (see `docs/ENVIRONMENT_SETUP.md`)
 - ✅ **Set ALLOWED_ORIGINS** in production for CORS security
 - ✅ **Never commit** `.env` files to git
@@ -912,6 +965,7 @@ if (user.role === 'admin') { // No type safety
 - ✅ **Different secrets** for each environment
 
 ### 5. Security Monitoring
+
 - ✅ **Monitor sanitization logs** for attack attempts
 - ✅ **Track large request attempts** (DoS indicators)
 - ✅ **Log authentication failures** for brute force detection
@@ -920,24 +974,27 @@ if (user.role === 'admin') { // No type safety
 ## 🌐 CORS & Environment Configuration
 
 ### Development CORS (Auto-configured)
+
 ```typescript
 // When ALLOWED_ORIGINS not set, automatically allows:
 [
-  `http://localhost:${PORT}`,     // Your current PORT
-  `http://127.0.0.1:${PORT}`,    // IP version
-  'http://localhost:3000',        // Common dev ports
+  `http://localhost:${PORT}`, // Your current PORT
+  `http://127.0.0.1:${PORT}`, // IP version
+  'http://localhost:3000', // Common dev ports
   'http://localhost:3001',
   // ... additional dev ports
-]
+];
 ```
 
 ### Production CORS (Required)
+
 ```env
 # Production .env - REQUIRED for security
 ALLOWED_ORIGINS=https://yourdomain.com,https://admin.yourdomain.com
 ```
 
 ### Custom Development CORS
+
 ```env
 # Development .env - when you need specific origins
 ALLOWED_ORIGINS=http://localhost:8080,http://myapp.dev:3000
@@ -954,12 +1011,15 @@ See `docs/ENVIRONMENT_SETUP.md` for complete configuration guide including new C
 ## 🚦 API Conventions
 
 ### Endpoints
+
 - Use RESTful conventions
 - Prefix with `/api/v1`
 - Use plural nouns for resources (`/users`, `/posts`)
 
 ### Security Headers
+
 All responses automatically include:
+
 ```http
 Content-Security-Policy: default-src 'self'; script-src 'self'
 Strict-Transport-Security: max-age=31536000; includeSubDomains
@@ -968,6 +1028,7 @@ X-Frame-Options: DENY
 ```
 
 ### Response Format
+
 All responses follow this structure:
 
 ```typescript
@@ -1010,12 +1071,14 @@ All responses follow this structure:
 ## 🐛 Debugging
 
 ### Local Development
+
 1. Use `npm run dev` for hot reloading
 2. Check logs in console (security events are highlighted)
 3. Use debugging tools in your IDE
 4. Set breakpoints in TypeScript files
 
 ### Security Debugging
+
 ```bash
 # Check sanitization in action
 # Look for logs like: "Sanitized potentially dangerous content in field: name"
@@ -1031,6 +1094,7 @@ curl -I http://localhost:3000/api/v1/health
 ```
 
 ### Container Issues
+
 ```typescript
 // Debug container services
 const container = Container.getInstance();
@@ -1042,6 +1106,7 @@ console.log('PostService registered:', isRegistered);
 ```
 
 ### Database Debugging
+
 ```bash
 # SQLite
 sqlite3 database.sqlite
@@ -1075,6 +1140,7 @@ SELECT * FROM posts;
 **Current Security Score: 9.0/10 (LOW RISK)**
 
 ### ✅ Implemented Security Features:
+
 - **XSS Prevention**: 10/10 - Comprehensive input sanitization
 - **Input Validation**: 9/10 - Schema validation + sanitization
 - **DoS Protection**: 8/10 - Request size limits + monitoring
@@ -1084,6 +1150,7 @@ SELECT * FROM posts;
 - **CORS Security**: 9/10 - Environment-aware configuration
 
 ### 🔄 Recent Security Enhancements (v1.1.0):
+
 - ✅ **Input Sanitization Middleware** - Prevents XSS attacks
 - ✅ **Request Size Limits** - Prevents DoS via large payloads
 - ✅ **Enhanced Security Headers** - CSP, HSTS, XSS protection
@@ -1096,4 +1163,4 @@ SELECT * FROM posts;
 
 Happy secure coding! 🎉🔒
 
-For questions or security concerns, please refer to the project documentation or contact the development team. 
+For questions or security concerns, please refer to the project documentation or contact the development team.

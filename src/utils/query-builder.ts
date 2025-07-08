@@ -1,5 +1,5 @@
 import { config } from '@/config/environment';
-import { AdvancedFilter, FilterOperator } from '@/types/common';
+import { AdvancedFilter, FilterOperator } from '@/types/filter';
 
 interface FilterOptions {
   tableAlias?: string;
