@@ -1,4 +1,5 @@
 import { FieldConfig, RepositorySchema } from '@/types/repository';
+import { logger } from './logger';
 
 /**
  * DataTransformer - Utility class for handling data transformation
@@ -160,15 +161,17 @@ export class DataTransformer {
         }
 
       case 'number':
-      case 'float':
+      case 'float': {
         const floatValue = parseFloat(originalValue);
         return isNaN(floatValue) ? 0 : floatValue;
+      }
 
-      case 'integer':
+      case 'integer': {
         const intValue = parseInt(originalValue, 10);
         return isNaN(intValue) ? 0 : intValue;
+      }
 
-      case 'decimal':
+      case 'decimal': {
         const decimalValue = parseFloat(originalValue);
         if (isNaN(decimalValue)) {
           return 0;
@@ -180,13 +183,14 @@ export class DataTransformer {
             return decimalValue;
           }
         }
+      }
 
       case 'date':
       case 'datetime':
         try {
           return new Date(originalValue);
         } catch (e) {
-          console.error(`Failed to convert to Date for field '${fieldKey}':`, originalValue);
+          logger.error(`Failed to convert to Date for field '${fieldKey}':`, originalValue);
           return new Date(); // Default to current date
         }
 
@@ -202,7 +206,7 @@ export class DataTransformer {
             return new Date(tsValue);
           }
         } catch (e) {
-          console.error(`Failed to convert timestamp for field '${fieldKey}':`, originalValue);
+          logger.error(`Failed to convert timestamp for field '${fieldKey}':`, originalValue);
           return new Date();
         }
 
@@ -212,7 +216,7 @@ export class DataTransformer {
           try {
             return JSON.parse(originalValue);
           } catch (e) {
-            console.error(`Failed to parse JSON/Array for field '${fieldKey}':`, originalValue);
+            logger.error(`Failed to parse JSON/Array for field '${fieldKey}':`, originalValue);
             return fieldConfig.type === 'array' ? [] : {};
           }
         } else if (originalValue === null || originalValue === undefined) {
@@ -226,7 +230,7 @@ export class DataTransformer {
         try {
           return BigInt(originalValue);
         } catch (e) {
-          console.error(`Failed to convert to BigInt for field '${fieldKey}':`, originalValue);
+          logger.error(`Failed to convert to BigInt for field '${fieldKey}':`, originalValue);
           return BigInt(0);
         }
 
@@ -244,11 +248,11 @@ export class DataTransformer {
             return Buffer.alloc(0);
           }
         } catch (e) {
-          console.error(`Failed to convert to Buffer for field '${fieldKey}':`, originalValue);
+          logger.error(`Failed to convert to Buffer for field '${fieldKey}':`, originalValue);
           return Buffer.alloc(0);
         }
 
-      case 'uuid':
+      case 'uuid': {
         // Validate and format UUID
         const uuidValue = originalValue?.toString() || '';
         const uuidRegex =
@@ -257,11 +261,12 @@ export class DataTransformer {
         if (uuidRegex.test(uuidValue)) {
           return uuidValue.toLowerCase();
         } else {
-          console.warn(`Invalid UUID format for field '${fieldKey}':`, originalValue);
+          logger.warn(`Invalid UUID format for field '${fieldKey}':`, originalValue);
           return uuidValue; // Keep original but warn
         }
+      }
 
-      case 'enum':
+      case 'enum': {
         // Get enum values from either enumType or enumValues
         let validValues: (string | number)[] = [];
 
@@ -284,7 +289,7 @@ export class DataTransformer {
           if (validValues.includes(valueToCheck)) {
             return valueToCheck;
           } else {
-            console.warn(
+            logger.warn(
               `Invalid enum value '${originalValue}' for field '${fieldKey}'. Expected one of: ${validValues.join(', ')}`
             );
             // Keep original value but log warning
@@ -294,6 +299,7 @@ export class DataTransformer {
           // No validation, just pass through
           return originalValue;
         }
+      }
 
       default:
         // Unknown type, pass through unchanged
@@ -354,7 +360,7 @@ export class DataTransformer {
           try {
             return new Date(value);
           } catch (e) {
-            console.error(`Failed to convert to Date for field '${fieldKey}':`, value);
+            logger.error(`Failed to convert to Date for field '${fieldKey}':`, value);
             return new Date();
           }
         }
@@ -370,7 +376,7 @@ export class DataTransformer {
           try {
             return Math.floor(new Date(value).getTime() / 1000);
           } catch (e) {
-            console.error(`Failed to convert to timestamp for field '${fieldKey}':`, value);
+            logger.error(`Failed to convert to timestamp for field '${fieldKey}':`, value);
             return Math.floor(Date.now() / 1000);
           }
         }
@@ -381,7 +387,7 @@ export class DataTransformer {
           try {
             return JSON.stringify(value);
           } catch (e) {
-            console.error(`Failed to stringify JSON/Array for field '${fieldKey}':`, value);
+            logger.error(`Failed to stringify JSON/Array for field '${fieldKey}':`, value);
             return fieldConfig.type === 'array' ? '[]' : '{}';
           }
         } else if (typeof value === 'string') {
@@ -390,7 +396,7 @@ export class DataTransformer {
             JSON.parse(value);
             return value;
           } catch (e) {
-            console.error(`Invalid JSON string for field '${fieldKey}':`, value);
+            logger.error(`Invalid JSON string for field '${fieldKey}':`, value);
             return fieldConfig.type === 'array' ? '[]' : '{}';
           }
         }
@@ -404,7 +410,7 @@ export class DataTransformer {
             return BigInt(value).toString();
           }
         } catch (e) {
-          console.error(`Failed to convert to BigInt for field '${fieldKey}':`, value);
+          logger.error(`Failed to convert to BigInt for field '${fieldKey}':`, value);
           return '0';
         }
 
@@ -419,7 +425,7 @@ export class DataTransformer {
           // Assume already base64 encoded
           return value;
         } else {
-          console.error(`Invalid buffer data for field '${fieldKey}':`, value);
+          logger.error(`Invalid buffer data for field '${fieldKey}':`, value);
           return '';
         }
 
