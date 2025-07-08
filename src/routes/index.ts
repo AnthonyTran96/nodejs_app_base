@@ -1,8 +1,10 @@
-import { Router } from 'express';
 import { Container } from '@/core/container';
 import { AuthController } from '@/modules/auth/auth.controller';
+import { PostController } from '@/modules/post/post.controller';
 import { UserController } from '@/modules/user/user.controller';
+import { Router } from 'express';
 import { createAuthRoutes } from './auth.routes';
+import { createPostRoutes } from './post.routes';
 import { createUserRoutes } from './user.routes';
 
 /**
@@ -44,14 +46,17 @@ export function initializeRoutes(): Router {
   // Get controllers from container with proper typing
   const authController = container.get<AuthController>('AuthController');
   const userController = container.get<UserController>('UserController');
+  const postController = container.get<PostController>('PostController');
 
   // Register route modules
   router.use('/auth', createAuthRoutes(authController));
   router.use('/users', createUserRoutes(userController));
+  router.use('/posts', createPostRoutes(postController));
 
   return router;
 }
 
 // Export individual route creators for testing or modular usage
 export { createAuthRoutes } from './auth.routes';
+export { createPostRoutes } from './post.routes';
 export { createUserRoutes } from './user.routes';

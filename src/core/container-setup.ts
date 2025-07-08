@@ -34,6 +34,7 @@ export class ContainerSetup {
     await import('@/core/core.registry');
     await import('@/modules/user/user.registry');
     await import('@/modules/auth/auth.registry');
+    await import('@/modules/post/post.registry');
 
     // 🎯 New modules can be added here by any developer
     // await import('@/modules/post/post.registry');
