@@ -1,9 +1,11 @@
 import { BaseRepository } from '@/core/base.repository';
 import { Service } from '@/core/container';
 import { FullPost, Post, PostFilter } from '@/models/post.model';
+import { User } from '@/models/user.model';
 import { PaginatedResult, PaginationOptions } from '@/types/common';
 import { AdvancedFilter } from '@/types/filter';
 import { RepositorySchema } from '@/types/repository';
+import { DataTransformer } from '@/utils/data-transformer';
 import { QueryBuilder } from '@/utils/query-builder';
 
 @Service('PostRepository')
@@ -11,9 +13,9 @@ export class PostRepository extends BaseRepository<Post> {
   protected readonly tableName = 'posts';
   protected override readonly schema: RepositorySchema<Post> = {
     published: 'boolean',
-    createdAt: 'date',
-    updatedAt: 'date',
-    authorId: 'number', // just for type consistency
+    createdAt: 'date', // auto-mapped to created_at
+    updatedAt: 'date', // auto-mapped to updated_at
+    authorId: 'integer', // auto-mapped to author_id
   };
 
   // Method to find posts with full detail information
@@ -23,9 +25,9 @@ export class PostRepository extends BaseRepository<Post> {
   ): Promise<PaginatedResult<FullPost>> {
     let sql = `
       SELECT 
-        p.id as post_id, p.title, p.content, p.author_id, p.published, p.created_at as createdAt, p.updated_at as updatedAt,
+        p.id as post_id, p.title, p.content, p.author_id, p.published, p.created_at as post_created_at, p.updated_at as post_updated_at,
         u.id as author_id, u.email as author_email, u.name as author_name, u.role as author_role, 
-        u.created_at as author_createdAt, u.updated_at as author_updatedAt
+        u.created_at as author_created_at, u.updated_at as author_updated_at
       FROM posts p
       JOIN users u ON p.author_id = u.id
     `;
@@ -35,8 +37,6 @@ export class PostRepository extends BaseRepository<Post> {
       title: { tableAlias: 'p', column: 'title' },
       content: { tableAlias: 'p', column: 'content' },
       published: { tableAlias: 'p', column: 'published' },
-      // authorId: { tableAlias: 'p', column: 'author_id' },
-      // id: { tableAlias: 'p', column: 'id' },
     };
 
     const optionsEngine = {
@@ -80,27 +80,35 @@ export class PostRepository extends BaseRepository<Post> {
 
     const result = await this.db.query<any>(sql, params);
 
-    // Transform the results to FullPost format
+    // Optimized schemas - omit type for fields that don't need transformation
+    const postSchema: RepositorySchema<Post> = {
+      id: { column: 'post_id' }, // no type needed - already integer from DB
+      // title and content: auto-mapped (column names match field names)
+      authorId: { column: 'author_id', type: 'integer' },
+      published: 'boolean', // auto-mapped to 'published' column
+      createdAt: { column: 'post_created_at', type: 'date' },
+      updatedAt: { column: 'post_updated_at', type: 'date' },
+    };
+
+    const authorSchema: RepositorySchema<User> = {
+      id: { column: 'author_id' }, // no type needed - already integer from DB
+      name: { column: 'author_name' }, // no type needed - already string from DB
+      email: { column: 'author_email' }, // no type needed - already string from DB
+      role: { column: 'author_role' }, // no type needed - already string from DB
+      createdAt: { column: 'author_created_at', type: 'date' },
+      updatedAt: { column: 'author_updated_at', type: 'date' },
+      password: { transform: () => '' }, // Custom transform to hide sensitive data
+    };
+
+    // Transform the results to FullPost format using DataTransformer
     const transformedData = result.rows.map(row => {
-      const post: FullPost = {
-        id: row.post_id,
-        title: row.title,
-        content: row.content,
-        authorId: row.author_id,
-        published: Boolean(row.published),
-        createdAt: new Date(row.createdat),
-        updatedAt: new Date(row.updatedat),
-        author: {
-          id: row.author_id,
-          email: row.author_email,
-          name: row.author_name,
-          role: row.author_role,
-          createdAt: new Date(row.author_createdat),
-          updatedAt: new Date(row.author_updatedat),
-          password: '', // We don't expose password
-        },
-      };
-      return post;
+      const post = DataTransformer.transformRow<Post>(row, postSchema);
+      const author = DataTransformer.transformRow<User>(row, authorSchema);
+
+      return {
+        ...post,
+        author,
+      } as FullPost;
     });
 
     return {

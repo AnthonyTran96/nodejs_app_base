@@ -9,8 +9,9 @@ import { QueryBuilder } from '@/utils/query-builder';
 export class UserRepository extends BaseRepository<User> {
   protected readonly tableName = 'users';
   protected override readonly schema: RepositorySchema<User> = {
-    createdAt: 'date',
-    updatedAt: 'date',
+    createdAt: 'date', // auto-mapped to created_at
+    updatedAt: 'date', // auto-mapped to updated_at
+    role: { type: 'enum', enumType: Role },
   };
 
   async findByEmail(email: string): Promise<User | null> {

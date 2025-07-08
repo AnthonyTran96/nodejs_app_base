@@ -4,6 +4,7 @@ import { PaginatedResult, PaginationOptions } from '@/types/common';
 import { QueryResult } from '@/types/database';
 import { AdvancedFilter } from '@/types/filter';
 import { RepositorySchema } from '@/types/repository';
+import { DataTransformer } from '@/utils/data-transformer';
 import { QueryBuilder } from '@/utils/query-builder';
 
 export abstract class BaseRepository<T> {
@@ -187,79 +188,19 @@ export abstract class BaseRepository<T> {
     return this.db.query<TResult>(sql, params);
   }
 
+  /**
+   * Transform database row to model object
+   * Uses DataTransformer for consistent transformation logic
+   */
   protected transformRow(row: any): T {
-    if (!row) {
-      return row;
-    }
-
-    const transformed: { [key: string]: any } = {};
-
-    // 1. Convert snake_case to camelCase
-    for (const key in row) {
-      if (Object.prototype.hasOwnProperty.call(row, key)) {
-        const camelCaseKey = key.replace(/_([a-z])/g, g => (g[1] ? g[1].toUpperCase() : ''));
-        transformed[camelCaseKey] = row[key];
-      }
-    }
-
-    // 2. Apply type transformations based on schema
-    for (const key in this.schema) {
-      if (Object.prototype.hasOwnProperty.call(transformed, key)) {
-        const fieldType = this.schema[key as keyof T];
-        const originalValue = transformed[key];
-
-        if (originalValue === null || originalValue === undefined) {
-          continue;
-        }
-
-        switch (fieldType) {
-          case 'boolean':
-            transformed[key] = Boolean(originalValue);
-            break;
-          case 'number':
-            transformed[key] = parseFloat(originalValue);
-            break;
-          case 'date':
-            transformed[key] = new Date(originalValue);
-            break;
-          case 'json':
-          case 'array':
-            if (typeof originalValue === 'string') {
-              try {
-                transformed[key] = JSON.parse(originalValue);
-              } catch (e) {
-                console.error(`Failed to parse JSON/Array for key '${key}':`, originalValue);
-              }
-            }
-            break;
-          case 'bigint':
-            try {
-              transformed[key] = BigInt(originalValue);
-            } catch (e) {
-              console.error(`Failed to convert to BigInt for key '${key}':`, originalValue);
-            }
-            break;
-          default:
-            break;
-        }
-      }
-    }
-
-    return transformed as T;
+    return DataTransformer.transformRow(row, this.schema);
   }
 
+  /**
+   * Transform model data to database format
+   * Uses DataTransformer for consistent transformation logic
+   */
   protected transformInputData(data: any): any {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return data;
-    }
-
-    const snakeCaseData: { [key: string]: any } = {};
-    for (const key in data) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        const snakeCaseKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-        snakeCaseData[snakeCaseKey] = data[key];
-      }
-    }
-    return snakeCaseData;
+    return DataTransformer.transformInputData(data, this.schema);
   }
 }

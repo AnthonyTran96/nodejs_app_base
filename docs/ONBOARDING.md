@@ -1068,96 +1068,665 @@ All responses follow this structure:
 }
 ```
 
-## 🐛 Debugging
+## 🗃️ Advanced Repository Features: Field Mapping
 
-### Local Development
+### Enhanced Schema System
 
-1. Use `npm run dev` for hot reloading
-2. Check logs in console (security events are highlighted)
-3. Use debugging tools in your IDE
-4. Set breakpoints in TypeScript files
+The repository layer now supports **advanced field mapping** that allows you to map model fields to specific database column names while maintaining automatic type transformations.
 
-### Security Debugging
-
-```bash
-# Check sanitization in action
-# Look for logs like: "Sanitized potentially dangerous content in field: name"
-
-# Test CORS configuration
-NODE_ENV=development node -e "
-const config = require('./dist/config/environment').config;
-console.log('Allowed Origins:', config.allowedOrigins);
-"
-
-# Test security headers
-curl -I http://localhost:3000/api/v1/health
-```
-
-### Container Issues
+### Schema Configuration Types
 
 ```typescript
-// Debug container services
-const container = Container.getInstance();
-console.log('Registered services:', container.getRegisteredServices());
+// Simple type definition (uses default snake_case conversion)
+protected override readonly schema: RepositorySchema<User> = {
+  createdAt: 'date',        // createdAt -> created_at (default)
+  isActive: 'boolean',      // isActive -> is_active (default)
+};
 
-// Check if service is registered
-const isRegistered = container.has('PostService');
-console.log('PostService registered:', isRegistered);
+// Advanced configuration with custom column mapping
+protected override readonly schema: RepositorySchema<User> = {
+  // Custom column mapping
+  emailAddress: {
+    type: 'string',
+    column: 'email'         // emailAddress -> email (custom)
+  },
+
+  isActive: {
+    type: 'boolean',
+    column: 'active'        // isActive -> active (custom)
+  },
+
+  // Mixed: some custom, some default
+  createdAt: {
+    type: 'date',
+    column: 'creation_date' // createdAt -> creation_date (custom)
+  },
+  updatedAt: 'date',        // updatedAt -> updated_at (default)
+};
 ```
 
-### Database Debugging
+### Field Mapping Examples
 
-```bash
-# SQLite
-sqlite3 database.sqlite
-.tables
-SELECT * FROM posts;
+#### Example 1: User Repository with Custom Mappings
 
-# PostgreSQL
-psql -h localhost -U username -d database
-\dt
-SELECT * FROM posts;
+```typescript
+// src/modules/user/user.repository.ts
+@Service('UserRepository')
+export class UserRepository extends BaseRepository<User> {
+  protected readonly tableName = 'users';
+  protected override readonly schema: RepositorySchema<User> = {
+    // Custom column mappings
+    createdAt: { type: 'date', column: 'created_at' },
+    updatedAt: { type: 'date', column: 'updated_at' },
+
+    // Fields without mappings use default conversion:
+    // id -> id (no change)
+    // email -> email (no change)
+    // name -> name (no change)
+    // role -> role (no change)
+    // password -> password (no change)
+  };
+}
 ```
 
-## 📚 Additional Resources
+#### Example 2: Complex Model with Mixed Mappings
 
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/)
-- [TypeScript Enums](https://www.typescriptlang.org/docs/handbook/enums.html)
-- [Express.js Guide](https://expressjs.com/en/guide/)
-- [Class Validator Documentation](https://github.com/typestack/class-validator)
-- [Jest Testing Framework](https://jestjs.io/docs/getting-started)
-- [OWASP Security Guidelines](https://owasp.org/www-project-top-ten/)
+```typescript
+interface Product {
+  id: number;
+  productName: string; // -> product_name (default)
+  shortDescription: string; // -> short_desc (custom)
+  fullDescription: string; // -> description (custom)
+  isAvailable: boolean; // -> available (custom)
+  categoryId: number; // -> category_id (default)
+  priceData: object; // -> price_info (custom, JSON)
+  createdAt: Date; // -> created_at (default)
+  lastModified: Date; // -> modified_date (custom)
+}
 
-## 📖 Project Documentation
+class ProductRepository extends BaseRepository<Product> {
+  protected readonly tableName = 'products';
+  protected override readonly schema: RepositorySchema<Product> = {
+    // Custom mappings
+    shortDescription: { type: 'string', column: 'short_desc' },
+    fullDescription: { type: 'string', column: 'description' },
+    isAvailable: { type: 'boolean', column: 'available' },
+    priceData: { type: 'json', column: 'price_info' },
+    lastModified: { type: 'date', column: 'modified_date' },
 
-- **Environment Setup**: `docs/ENVIRONMENT_SETUP.md` - Now includes CORS configuration
-- **Database Management**: `docs/DATABASE_MIGRATION_GUIDE.md`
-- **This Guide**: `docs/ONBOARDING.md` - Enhanced with security practices
-- **Security Reports**: `reports/security-testing/` - Comprehensive security audit results
+    // Default mappings (no configuration needed)
+    // productName -> product_name
+    // categoryId -> category_id
+    // createdAt -> created_at
+  };
+}
+```
 
-## 🎯 Security Assessment Summary
+### How Field Mapping Works
 
-**Current Security Score: 9.0/10 (LOW RISK)**
+#### 1. Reading from Database (`transformRow`)
 
-### ✅ Implemented Security Features:
+```typescript
+// Database row (snake_case columns)
+const dbRow = {
+  id: 1,
+  email: 'user@example.com', // Custom mapping
+  created_at: '2024-01-01', // Custom mapping
+  user_name: 'john_doe', // Default conversion
+};
 
-- **XSS Prevention**: 10/10 - Comprehensive input sanitization
-- **Input Validation**: 9/10 - Schema validation + sanitization
-- **DoS Protection**: 8/10 - Request size limits + monitoring
-- **Headers Security**: 9/10 - Full security headers suite
-- **Authentication**: 10/10 - JWT-based with proper validation
-- **Authorization**: 10/10 - Type-safe RBAC system
-- **CORS Security**: 9/10 - Environment-aware configuration
+// Transformed to model (camelCase fields)
+const model = {
+  id: 1,
+  emailAddress: 'user@example.com', // email -> emailAddress (custom)
+  createdAt: new Date('2024-01-01'), // created_at -> createdAt (custom + type)
+  userName: 'john_doe', // user_name -> userName (default)
+};
+```
 
-### 🔄 Recent Security Enhancements (v1.1.0):
+#### 2. Writing to Database (`transformInputData`)
 
-- ✅ **Input Sanitization Middleware** - Prevents XSS attacks
-- ✅ **Request Size Limits** - Prevents DoS via large payloads
-- ✅ **Enhanced Security Headers** - CSP, HSTS, XSS protection
-- ✅ **Dynamic CORS Configuration** - Environment-aware origins
-- ✅ **Security Monitoring** - Comprehensive logging of security events
+```typescript
+// Model data (camelCase fields)
+const modelData = {
+  emailAddress: 'user@example.com', // -> email (custom)
+  userName: 'john_doe', // -> user_name (default)
+  isActive: true, // -> active (custom)
+  createdAt: new Date(), // -> creation_date (custom)
+};
 
-**🛡️ This project is PRODUCTION READY with enterprise-grade security measures!**
+// Transformed to database format (snake_case columns)
+const dbData = {
+  email: 'user@example.com', // emailAddress -> email
+  user_name: 'john_doe', // userName -> user_name
+  active: true, // isActive -> active
+  creation_date: new Date(), // createdAt -> creation_date
+};
+```
+
+### Comprehensive Field Types
+
+The repository system now supports a comprehensive set of field types to handle all common database data types:
+
+```typescript
+export type FieldType =
+  // String Types
+  | 'string' // Default string handling
+  | 'text' // Large text fields (semantic distinction)
+  | 'uuid' // UUID validation and formatting
+
+  // Number Types
+  | 'number' // General number (parseFloat)
+  | 'integer' // Specific integer handling (parseInt)
+  | 'float' // Explicit float handling (parseFloat)
+  | 'decimal' // High precision decimal with optional precision
+
+  // Boolean Type
+  | 'boolean' // Enhanced boolean conversion (true/false, 1/0, yes/no, on/off)
+
+  // Date/Time Types
+  | 'date' // Date object conversion
+  | 'datetime' // Alias for date (semantic distinction)
+  | 'timestamp' // Unix timestamp to Date conversion
+
+  // Complex Types
+  | 'json' // JSON.parse() for objects
+  | 'array' // JSON.parse() for arrays
+  | 'bigint' // BigInt() conversion
+  | 'buffer' // Buffer handling for binary data
+
+  // Validation Types
+  | 'enum'; // Enum validation with enumValues/enumType
+```
+
+#### Field Type Examples
+
+```typescript
+protected override readonly schema: RepositorySchema<Model> = {
+  // String types
+  name: 'string',                    // Basic string
+  description: 'text',               // Large text content
+  userId: 'uuid',                    // UUID with validation
+
+  // Number types
+  score: 'number',                   // General number (float)
+  count: 'integer',                  // Integer only
+  rating: 'float',                   // Explicit float
+  price: {                           // Decimal with precision
+    type: 'decimal',
+    precision: 2                     // 2 decimal places
+  },
+
+  // Boolean (handles multiple input formats)
+  isActive: 'boolean',               // true/false, 1/0, 'yes'/'no', 'on'/'off'
+
+  // Date/Time types
+  createdAt: 'date',                 // Standard Date
+  lastLogin: 'datetime',             // Alias for date
+  unixTime: 'timestamp',             // Unix timestamp → Date
+
+  // Complex types
+  metadata: 'json',                  // Object ↔ JSON string
+  tags: 'array',                     // Array ↔ JSON string
+  largeId: 'bigint',                 // BigInt ↔ string
+  avatar: 'buffer',                  // Buffer ↔ base64 string
+
+  // Enums
+  role: { type: 'enum', enumType: Role },
+  status: { type: 'enum', enumType: Status },
+};
+```
+
+### Enum Field Type Usage
+
+The `enum` field type provides automatic validation of enum values with support for string, number, and mixed enums:
+
+#### Method 1: Direct Enum Type Reference (Recommended)
+
+```typescript
+import { Role } from '@/types/role.enum';
+
+// String enum
+enum Status {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  PENDING = 'pending',
+}
+
+// Number enum
+enum Priority {
+  LOW = 1,
+  MEDIUM = 2,
+  HIGH = 3,
+}
+
+// Mixed enum
+enum TaskType {
+  PERSONAL = 'personal',
+  URGENT = 1,
+}
+
+// Use in schema with enumType (RECOMMENDED)
+protected override readonly schema: RepositorySchema<Task> = {
+  role: {
+    type: 'enum',
+    enumType: Role          // ✅ Clean, type-safe, auto-completion
+  },
+
+  status: {
+    type: 'enum',
+    enumType: Status        // ✅ String enum support
+  },
+
+  priority: {
+    type: 'enum',
+    enumType: Priority      // ✅ Number enum support
+  },
+
+  taskType: {
+    type: 'enum',
+    enumType: TaskType,     // ✅ Mixed enum support
+    column: 'type'          // ✅ Can combine with custom column mapping
+  },
+};
+```
+
+#### Method 2: Manual Enum Values (Legacy Support)
+
+```typescript
+// Still supported but not recommended
+protected override readonly schema: RepositorySchema<User> = {
+  role: {
+    type: 'enum',
+    enumValues: ['user', 'admin']  // ❌ More verbose, no type safety
+  },
+
+  priority: {
+    type: 'enum',
+    enumValues: [1, 2, 3, 4]       // ✅ Number enum values
+  },
+};
+```
+
+**Enhanced Enum Features:**
+
+- ✅ **String Enums**: `'active'` → `'active'` (direct pass-through)
+- ✅ **Number Enums**: `'2'` → `2` (auto-converts string to number)
+- ✅ **Mixed Enums**: Handles both string and number values
+- ✅ **Type Safety**: Direct enum reference with TypeScript validation
+- ✅ **Auto-completion**: IDE suggests valid enum names
+- ✅ **Refactoring Safe**: Enum changes update automatically
+
+**Enum Validation Examples:**
+
+```typescript
+// String enum validation
+// Database: "active" -> Model: "active" ✅
+// Database: "invalid" -> Model: "invalid" ⚠️ (with warning)
+
+// Number enum validation
+// Database: "2" -> Model: 2 ✅ (auto-converts)
+// Database: 2 -> Model: 2 ✅ (already number)
+// Database: "99" -> Model: "99" ⚠️ (invalid, with warning)
+
+// Console warning example:
+// ⚠️ "Invalid enum value 'invalid_role' for field 'role'. Expected one of: user, admin"
+```
+
+#### Type Conversion Behavior
+
+**String Types:**
+
+- `'string'`: Converts any value to string using `toString()`
+- `'text'`: Same as string (semantic distinction for large text fields)
+- `'uuid'`: Validates UUID format, warns on invalid format but preserves value
+
+**Number Types:**
+
+- `'number'/'float'`: Uses `parseFloat()`, defaults to 0 on NaN
+- `'integer'`: Uses `parseInt()`, defaults to 0 on NaN
+- `'decimal'`: Uses `parseFloat()` with optional precision rounding
+
+**Boolean Type:**
+
+- `'boolean'`: Enhanced conversion supporting multiple formats:
+  - `true/false` → `true/false`
+  - `'true'/'1'/'yes'/'on'` → `true`
+  - `'false'/'0'/'no'/'off'` → `false`
+  - Numbers: `0` → `false`, others → `true`
+
+**Date/Time Types:**
+
+- `'date'/'datetime'`: Uses `new Date()` conversion
+- `'timestamp'`: Converts Unix timestamps to Date objects
+  - Auto-detects seconds (10 digits) vs milliseconds
+  - Handles both string and number inputs
+
+**Complex Types:**
+
+- `'json'`: Bidirectional JSON conversion (parse on read, stringify on write)
+- `'array'`: Same as JSON but defaults to `[]` on error
+- `'bigint'`: Converts to BigInt on read, stores as string in database
+- `'buffer'`: Handles binary data as base64 strings in database
+
+**Error Handling:**
+
+- All type conversions include comprehensive error handling
+- Invalid data logs warnings but preserves original values (prevents data loss)
+- Provides sensible defaults for failed conversions
+
+### Migration Guide for Existing Repositories
+
+If you have existing repositories, you can gradually adopt field mapping:
+
+```typescript
+// Before (still works)
+protected override readonly schema: RepositorySchema<User> = {
+  createdAt: 'date',
+  updatedAt: 'date',
+};
+
+// After (enhanced with custom mappings)
+protected override readonly schema: RepositorySchema<User> = {
+  createdAt: { type: 'date', column: 'created_at' },
+  updatedAt: { type: 'date', column: 'updated_at' },
+};
+```
+
+### Best Practices for Field Mapping
+
+#### ✅ Good Practices
+
+```typescript
+// 1. Use custom mappings for legacy database columns
+emailAddress: { type: 'string', column: 'email' },
+
+// 2. Map foreign keys to more descriptive names
+authorId: { type: 'number', column: 'author_id' },
+
+// 3. Use custom mappings for database-specific naming
+createdAt: { type: 'date', column: 'creation_timestamp' },
+
+// 4. Combine type conversion with custom mapping
+isActive: { type: 'boolean', column: 'active_flag' },
+
+// 5. Use enum validation with direct enum type (RECOMMENDED)
+role: { type: 'enum', enumType: Role },
+status: { type: 'enum', enumType: Status },
+priority: { type: 'enum', enumType: Priority }, // Works with number enums
+
+// 6. Combine enum with custom column mapping
+userType: {
+  type: 'enum',
+  enumType: UserType,
+  column: 'type'
+},
+
+// 7. Legacy enum values approach (still supported)
+// status: { type: 'enum', enumValues: ['active', 'inactive'] }, // Less preferred
+```
+
+#### ❌ Avoid These Patterns
+
+```typescript
+// Don't create mappings for every field if you can use schema
+// Use DataTransformer.transformRow(row, schema) instead
+
+// Don't use manual type conversion when DataTransformer handles it
+published: Boolean(row.published), // Use type: 'boolean' instead
+
+// Don't repeat mapping definitions - create reusable constants
+// Define postFieldMappings, authorFieldMappings as constants
+```
+
+### Available Methods
+
+```typescript
+// Schema-based transformations
+DataTransformer.transformRow<T>(row: any, schema: RepositorySchema<T>): T
+DataTransformer.transformInputData<T>(data: any, schema: RepositorySchema<T>): any
+
+// Custom field mappings
+DataTransformer.transformCustomRow<T>(row: any, mappings: FieldMappings): Partial<T>
+
+// Utility methods
+DataTransformer.getFieldConfig<T>(schema: RepositorySchema<T>, fieldKey: keyof T): FieldConfig
+DataTransformer.getColumnName<T>(schema: RepositorySchema<T>, fieldKey: string): string
+DataTransformer.getFieldName<T>(schema: RepositorySchema<T>, columnName: string): string
+
+// Type-specific transformations
+DataTransformer.transformFieldValue(value: any, fieldConfig: FieldConfig, fieldKey: string): any
+DataTransformer.transformInputFieldValue(value: any, fieldConfig: FieldConfig, fieldKey: string): any
+```
+
+### Example File
+
+See comprehensive usage examples in the DataTransformer section below.
+
+---
+
+## 🔄 DataTransformer Utility
+
+### Overview
+
+The `DataTransformer` utility class extracts and centralizes all data transformation logic from `BaseRepository`, making it reusable across complex queries and custom operations. This is particularly useful for JOIN queries and custom data transformations that don't fit the standard repository schema.
+
+### Key Features
+
+- ✅ **Reusable Logic**: Extract transformation logic from repositories
+- ✅ **Custom Mappings**: Handle complex JOIN queries with field mappings
+- ✅ **Transform Functions**: Custom transformation logic for specific fields
+- ✅ **Type Safety**: Full TypeScript support with generic types
+- ✅ **Performance**: Consistent transformation logic across the application
+
+### Basic Usage
+
+#### 1. Schema-Based Transformation
+
+```typescript
+import { DataTransformer } from '@/utils/data-transformer';
+
+// Use existing repository schema
+const transformedUser = DataTransformer.transformRow(dbRow, userSchema);
+const dbData = DataTransformer.transformInputData(userData, userSchema);
+```
+
+#### 2. Custom Field Mappings (Complex Queries)
+
+```typescript
+// For JOIN queries or custom column names using RepositorySchema with transforms
+const postSchema: RepositorySchema<Post> = {
+  id: { column: 'post_id', type: 'integer' },
+  title: { column: 'post_title', type: 'string' },
+  published: { column: 'post_published', type: 'boolean' },
+  createdAt: { column: 'post_created_at', type: 'date' },
+};
+
+const authorSchema: RepositorySchema<User> = {
+  id: { column: 'author_id', type: 'integer' },
+  name: { column: 'author_name', type: 'string' },
+  email: { column: 'author_email', type: 'string' },
+  password: { transform: () => '' }, // Hide sensitive data using transform function
+};
+
+// Transform raw query results
+const rawResult = await db.query(`
+  SELECT 
+    p.id as post_id, p.title as post_title, p.published as post_published,
+    u.id as author_id, u.name as author_name, u.email as author_email
+  FROM posts p 
+  JOIN users u ON p.author_id = u.id
+`);
+
+const transformedData = rawResult.rows.map(row => {
+  const post = DataTransformer.transformRow<Post>(row, postSchema);
+  const author = DataTransformer.transformRow<User>(row, authorSchema);
+  return { ...post, author };
+});
+```
+
+#### 3. Custom Transform Functions
+
+```typescript
+const customSchema: RepositorySchema<CustomUser> = {
+  id: { column: 'user_id', type: 'integer' },
+  displayName: {
+    column: 'first_name',
+    transform: (value: string) => (value ? value.toUpperCase() : 'UNKNOWN'),
+  },
+  isVip: {
+    column: 'subscription_level',
+    transform: (level: string) => level === 'premium' || level === 'enterprise',
+  },
+  fullName: {
+    transform: () => 'Custom Value', // Custom logic without column mapping
+  },
+};
+
+const result = DataTransformer.transformRow<CustomUser>(row, customSchema);
+```
+
+### Real-World Example: PostRepository
+
+Here's how `PostRepository.findFullPosts()` uses DataTransformer:
+
+```typescript
+async findFullPosts(filters = {}, options?): Promise<PaginatedResult<FullPost>> {
+  // Execute complex JOIN query
+  const sql = `
+    SELECT
+      p.id as post_id, p.title, p.content, p.published,
+      p.created_at as post_created_at,
+      u.id as author_id, u.name as author_name, u.email as author_email,
+      u.created_at as author_created_at
+    FROM posts p
+    JOIN users u ON p.author_id = u.id
+  `;
+
+  const result = await this.db.query(sql, params);
+
+  // Define field schemas
+  const postSchema: RepositorySchema<Post> = {
+    id: { column: 'post_id', type: 'integer' },
+    title: { column: 'title', type: 'string' },
+    content: { column: 'content', type: 'text' },
+    published: { column: 'published', type: 'boolean' },
+    createdAt: { column: 'post_created_at', type: 'date' },
+  };
+
+  const authorSchema: RepositorySchema<User> = {
+    id: { column: 'author_id', type: 'integer' },
+    name: { column: 'author_name', type: 'string' },
+    email: { column: 'author_email', type: 'string' },
+    createdAt: { column: 'author_created_at', type: 'date' },
+    password: { transform: () => '' }, // Hide password
+  };
+
+  // Transform results using DataTransformer
+  const transformedData = result.rows.map(row => {
+    const post = DataTransformer.transformRow<Post>(row, postSchema);
+    const author = DataTransformer.transformRow<User>(row, authorSchema);
+    return { ...post, author } as FullPost;
+  });
+
+  return { data: transformedData, meta: paginationMeta };
+}
+```
+
+### Migration from Manual Transformation
+
+#### Before (Manual Transformation)
+
+```typescript
+// ❌ Manual, error-prone transformation
+const transformedData = result.rows.map(row => ({
+  id: row.post_id,
+  title: row.title,
+  published: Boolean(row.published), // Manual type conversion
+  createdAt: new Date(row.post_created_at), // Manual date conversion
+  author: {
+    id: row.author_id,
+    name: row.author_name,
+    email: row.author_email,
+    password: '', // Manual hiding
+  },
+}));
+```
+
+#### After (Using DataTransformer)
+
+```typescript
+// ✅ Clean, reusable, type-safe transformation
+const post = DataTransformer.transformRow<Post>(row, postSchema);
+const author = DataTransformer.transformRow<User>(row, authorSchema);
+return { ...post, author } as FullPost;
+```
+
+### Best Practices
+
+#### ✅ Good Practices
+
+```typescript
+// 1. Define reusable schemas
+const commonUserSchema: RepositorySchema<User> = {
+  id: { column: 'user_id', type: 'integer' },
+  email: { column: 'email', type: 'string' },
+  createdAt: { column: 'created_at', type: 'date' },
+};
+
+// 2. Use transform functions for sensitive data
+password: { transform: () => '' },
+apiKey: { transform: () => '[HIDDEN]' },
+
+// 3. Combine with type safety
+const user = DataTransformer.transformRow<User>(row, userSchema);
+
+// 4. Reuse existing repository schemas when possible
+DataTransformer.transformRow(row, this.schema);
+
+// 5. Handle computed fields with transforms
+fullName: {
+  transform: (value, row) => `${row.first_name} ${row.last_name}`
+},
+```
+
+#### ❌ Avoid These Patterns
+
+```typescript
+// Don't create schemas for every field if you can use existing repository schema
+// Use DataTransformer.transformRow(row, this.schema) when possible
+
+// Don't use manual type conversion when DataTransformer handles it
+published: Boolean(row.published), // Use type: 'boolean' in schema instead
+
+// Don't repeat schema definitions - create reusable constants
+// Define postSchema, authorSchema as constants and reuse them
+```
+
+### Available Methods
+
+```typescript
+// Primary transformation methods
+DataTransformer.transformRow<T>(row: any, schema: RepositorySchema<T>): T
+DataTransformer.transformInputData<T>(data: any, schema: RepositorySchema<T>): any
+
+// Utility methods for schema introspection
+DataTransformer.getFieldConfig<T>(schema: RepositorySchema<T>, fieldKey: keyof T): FieldConfig
+DataTransformer.getColumnName<T>(schema: RepositorySchema<T>, fieldKey: string): string
+DataTransformer.getFieldName<T>(schema: RepositorySchema<T>, columnName: string): string
+
+// Type-specific transformations (internal use)
+DataTransformer.transformFieldValue(value: any, fieldConfig: FieldConfig, fieldKey: string): any
+DataTransformer.transformInputFieldValue(value: any, fieldConfig: FieldConfig, fieldKey: string): any
+```
+
+### Key Benefits
+
+- ✅ **Unified API**: Single `transformRow` method for all transformation needs
+- ✅ **Type Safety**: Full TypeScript support with generic types
+- ✅ **Transform Functions**: Custom logic with access to raw row data
+- ✅ **Reusable Schemas**: Standard `RepositorySchema` interface for consistency
+- ✅ **Performance**: Optimized transformation logic across the application
 
 ---
 
