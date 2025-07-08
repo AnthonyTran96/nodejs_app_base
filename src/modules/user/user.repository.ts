@@ -51,7 +51,7 @@ export class UserRepository extends BaseRepository<User> {
 
   async countByRole(role: Role): Promise<number> {
     const sql = `SELECT COUNT(*) as count FROM ${this.tableName} WHERE role = ${QueryBuilder.createPlaceholder(0)}`;
-    const result = await this.executeQuery<{ count: number }>(sql, [role]);
-    return result.rows[0]?.count || 0;
+    const result = await this.executeQuery<{ count: string | number }>(sql, [role]);
+    return Number(result.rows[0]?.count || 0);
   }
 }

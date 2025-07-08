@@ -75,6 +75,8 @@ describe('Users E2E Tests', () => {
       // Assert
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveLength(2);
+      expect(response.body.meta.total).toBe(2);
+      expect(typeof response.body.meta.total).toBe('number');
     });
 
     it('should return 403 for non-admin users', async () => {

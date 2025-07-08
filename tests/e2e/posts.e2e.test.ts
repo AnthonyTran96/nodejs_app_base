@@ -81,6 +81,8 @@ describe('Posts E2E Tests', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data).toHaveLength(1);
+      expect(response.body.meta.total).toBe(1);
+      expect(typeof response.body.meta.total).toBe('number');
       expect(response.body.data[0].author.name).toBe('Regular User');
     });
 
@@ -91,6 +93,8 @@ describe('Posts E2E Tests', () => {
         .expect(200);
 
       expect(response.body.data).toHaveLength(1);
+      expect(response.body.meta.total).toBe(1);
+      expect(typeof response.body.meta.total).toBe('number');
     });
   });
 

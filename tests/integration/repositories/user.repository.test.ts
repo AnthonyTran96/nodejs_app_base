@@ -1,6 +1,6 @@
-import { UserRepository } from '@/user/user.repository';
 import { DatabaseConnection } from '@/database/connection';
 import { Role } from '@/types/role.enum';
+import { UserRepository } from '@/user/user.repository';
 
 describe('UserRepository Integration Tests', () => {
   let userRepository: UserRepository;
@@ -123,6 +123,8 @@ describe('UserRepository Integration Tests', () => {
 
       // Assert
       expect(result.data).toHaveLength(2);
+      expect(result.meta.total).toBe(3);
+      expect(typeof result.meta.total).toBe('number');
       expect(result.meta).toEqual({
         page: 1,
         limit: 2,
@@ -153,11 +155,11 @@ describe('UserRepository Integration Tests', () => {
       }
 
       // Act
-      const result = await userRepository.findAll({ 
-        page: 1, 
-        limit: 10, 
-        sortBy: 'name', 
-        sortOrder: 'ASC' 
+      const result = await userRepository.findAll({
+        page: 1,
+        limit: 10,
+        sortBy: 'name',
+        sortOrder: 'ASC',
       });
 
       // Assert
@@ -194,7 +196,9 @@ describe('UserRepository Integration Tests', () => {
       expect(updatedUser!.name).toBe(updateData.name);
       expect(updatedUser!.role).toBe(updateData.role);
       expect(updatedUser!.email).toBe(userData.email); // Should not change
-      expect(updatedUser!.updatedAt.getTime()).toBeGreaterThanOrEqual(createdUser.updatedAt.getTime());
+      expect(updatedUser!.updatedAt.getTime()).toBeGreaterThanOrEqual(
+        createdUser.updatedAt.getTime()
+      );
     });
 
     it('should return null when updating non-existent user', async () => {
@@ -334,7 +338,7 @@ describe('UserRepository Integration Tests', () => {
     it('should return empty array for non-existent role', async () => {
       // Act - Note: we can't test non-existent role with enum, so skip this test
       // const users = await userRepository.findByRole('nonexistent');
-      
+
       // Act with valid role but no data
       const users = await userRepository.findByRole(Role.ADMIN);
 
@@ -398,4 +402,4 @@ describe('UserRepository Integration Tests', () => {
       expect(updatedUser!.updatedAt.getTime()).toBeGreaterThanOrEqual(originalUpdatedAt.getTime());
     });
   });
-}); 
+});

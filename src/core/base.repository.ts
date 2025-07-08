@@ -54,8 +54,8 @@ export abstract class BaseRepository<T> {
     if (where) {
       countSql += ' WHERE ' + where;
     }
-    const countResult = await this.db.query<{ total: number }>(countSql, params);
-    const total = countResult.rows[0]?.total || 0;
+    const countResult = await this.db.query<{ total: string | number }>(countSql, params);
+    const total = Number(countResult.rows[0]?.total || 0);
 
     // Pagination
     if (options?.limit && options?.page) {
