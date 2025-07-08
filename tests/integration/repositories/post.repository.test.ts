@@ -107,6 +107,8 @@ describe('PostRepository Integration Tests', () => {
 
       // Assert
       expect(result.data).toHaveLength(2);
+      expect(result.meta.total).toBe(2);
+      expect(typeof result.meta.total).toBe('number');
       expect(result.data[0]!.author).toBeDefined();
       expect(result.data[0]!.author.id).toBe(testUser.id);
       expect(result.data[0]!.author.name).toBe('Test Author');
