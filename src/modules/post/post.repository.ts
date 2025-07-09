@@ -1,9 +1,9 @@
 import { BaseRepository } from '@/core/base.repository';
 import { Service } from '@/core/container';
-import { FullPost, Post, PostFilter } from '@/models/post.model';
+import { FullPost, Post } from '@/models/post.model';
 import { User } from '@/models/user.model';
 import { PaginatedResult, PaginationOptions } from '@/types/common';
-import { AdvancedFilter } from '@/types/filter';
+import { AdvancedFilter, FilterMapping, FilterOptions } from '@/types/filter';
 import { RepositorySchema } from '@/types/repository';
 import { DataTransformer } from '@/utils/data-transformer';
 import { QueryBuilder } from '@/utils/query-builder';
@@ -20,7 +20,7 @@ export class PostRepository extends BaseRepository<Post> {
 
   // Method to find posts with full detail information
   async findFullPosts(
-    filters: AdvancedFilter<PostFilter> = {},
+    filters: AdvancedFilter<any> = {},
     options?: PaginationOptions
   ): Promise<PaginatedResult<FullPost>> {
     let sql = `
@@ -32,14 +32,16 @@ export class PostRepository extends BaseRepository<Post> {
       JOIN users u ON p.author_id = u.id
     `;
 
-    const filterMapping = {
+    const filterMapping: FilterMapping = {
+      authorId: { tableAlias: 'u', column: 'id' },
       authorName: { tableAlias: 'u', column: 'name' },
-      title: { tableAlias: 'p', column: 'title' },
-      content: { tableAlias: 'p', column: 'content' },
-      published: { tableAlias: 'p', column: 'published' },
+      authorEmail: { tableAlias: 'u', column: 'email' },
+      authorRole: { tableAlias: 'u', column: 'role' },
+      authorCreatedAt: { tableAlias: 'u', column: 'created_at' },
+      authorUpdatedAt: { tableAlias: 'u', column: 'updated_at' },
     };
 
-    const optionsEngine = {
+    const optionsEngine: FilterOptions = {
       tableAlias: 'p',
       filterMapping,
     };
