@@ -1,9 +1,9 @@
 import { DatabaseConnection } from '@/database/connection';
-import { HashUtil } from '@/utils/hash';
-import { Seed } from './seed.interface';
-import { logger } from '@/utils/logger';
-import { config } from '@/config/environment';
 import { Role } from '@/types/role.enum';
+import { HashUtil } from '@/utils/hash';
+import { logger } from '@/utils/logger';
+import { QueryBuilder } from '@/utils/query-builder';
+import { Seed } from './seed.interface';
 
 export class CreateSampleUsersSeed implements Seed {
   readonly name = 'create_sample_users';
@@ -15,15 +15,6 @@ export class CreateSampleUsersSeed implements Seed {
     this.dbConnection = DatabaseConnection.getInstance();
   }
 
-  // Helper method for database-specific placeholder
-  private createPlaceholder(index: number): string {
-    if (config.database.type === 'postgresql') {
-      return `$${index + 1}`;
-    } else {
-      return '?';
-    }
-  }
-
   // Helper method to create a user if not exists
   private async createUserIfNotExists(
     email: string,
@@ -33,13 +24,13 @@ export class CreateSampleUsersSeed implements Seed {
     description: string
   ): Promise<void> {
     const existingUser = await this.dbConnection.query(
-      `SELECT id FROM users WHERE email = ${this.createPlaceholder(0)}`,
+      `SELECT id FROM users WHERE email = ${QueryBuilder.createPlaceholder(0)}`,
       [email]
     );
 
     if (existingUser.rows.length === 0) {
       const hashedPassword = await HashUtil.hash(password);
-      const insertSQL = `INSERT INTO users (email, password, name, role) VALUES (${this.createPlaceholder(0)}, ${this.createPlaceholder(1)}, ${this.createPlaceholder(2)}, ${this.createPlaceholder(3)})`;
+      const insertSQL = `INSERT INTO users (email, password, name, role) VALUES (${QueryBuilder.createPlaceholders(4)})`;
 
       await this.dbConnection.execute(insertSQL, [email, hashedPassword, name, role]);
       logger.info(`✅ ${description} created: ${email} / ${password}`);
