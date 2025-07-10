@@ -1,0 +1,181 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches:
+      - auto-build # Trigger workflow on push to auto-build
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20' # Specify the Node.js version you want to use
+
+      # Step 3: Setup SSH key
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      # Step 4: Add Server to Known Hosts
+      - name: Add SSH Host Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_FINGERPRINT }}" >> ~/.ssh/known_hosts
+
+      # Step 5: Setup cloudflared for ARM64 and Test Connection to Server
+      - name: Setup cloudflared
+        run: |
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb -o cloudflared.deb
+          sudo dpkg -i cloudflared.deb
+          ssh -i ~/.ssh/id_ed25519 -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }} 
+          echo '✅ SSH kết nối thành công qua Cloudflare Tunnel'
+          touch test.txt
+          scp -i ~/.ssh/id_ed25519 -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" test.txt ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }}:"/home/${{ secrets.SSH_USER }}/Projects/tmp/htc/${{ vars.APP_NAME }}" 
+          echo '✅ SCP thành công qua Cloudflare Tunnel'
+
+      # Step 6: Install dependencies
+      - name: Install dependencies
+        run: |
+          yarn install
+
+      # Step 7: Lint check
+      - name: Lint check
+        run: |
+          yarn lint
+
+      # Step 8: Build the app
+      - name: Build the app
+        run: |
+          yarn build
+
+      # Step 9: Remove dev and native dependencies
+      - name: Remove dev and native dependencies
+        run: |
+          yarn script:check_native
+          mv package_non_native.json package.json
+          rm -rf node_modules
+          yarn install --omit=dev
+          mv package_native.json package.json
+
+      # Step 10: Zip all necessary files in a build directory
+      - name: Zip all necessary files
+        run: |
+          mkdir -p output
+          [ -d public ] && mv public output/ 
+          mv dist scripts node_modules pm2.config.js package.json yarn.lock output/
+          zip -r build.zip output/
+
+      # Step 11: Copy file to server via Cloudflare SSH
+      - name: Copy file to server via Cloudflare SSH
+        run: |
+          scp -i ~/.ssh/id_ed25519 -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" build.zip ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }}:"/home/${{ secrets.SSH_USER }}/Projects/tmp/htc/${{ vars.APP_NAME }}"
+
+      # Step 12a: Deploy Files to Server
+      - name: Deploy Files to Server
+        timeout-minutes: 5
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o "ConnectTimeout=30" -o "ServerAliveInterval=10" -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }} << 'EOF'
+          set -e
+
+          echo "🚀 Starting file deployment..."
+          unzip -o /home/${USER}/Projects/tmp/htc/${{ vars.APP_NAME }}/build.zip -d /home/${USER}/Projects/htc/
+          cd /home/${USER}/Projects/htc
+
+          echo "📦 Creating backup of existing application..."
+          [ -d ${{ vars.APP_NAME }} ] && zip -r /home/${USER}/Projects/bak/htc/${{ vars.APP_NAME }}.zip ${{ vars.APP_NAME }}
+          [ -d ${{ vars.APP_NAME }} ] && rm -rf ${{ vars.APP_NAME }}
+
+          echo "📁 Moving new files..."
+          mv output ${{ vars.APP_NAME }}
+          cd ${{ vars.APP_NAME }}
+
+          echo "⚙️ Copying environment configuration..."
+          cp /home/${USER}/Projects/env/${{ vars.APP_NAME }}/.env .env
+
+          echo "✅ Files deployed successfully"
+          EOF
+
+      # Step 12b: Setup Dependencies
+      - name: Setup Dependencies
+        timeout-minutes: 10
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o "ConnectTimeout=30" -o "ServerAliveInterval=10" -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }} << 'EOF'
+          set -e
+
+          cd /home/${USER}/Projects/htc/${{ vars.APP_NAME }}
+
+          echo "🔍 Checking SQLite module..."
+          timeout 30 yarn script:check_sqlite
+
+          echo "📦 Installing production dependencies..."
+          yarn install --omit=dev
+
+          echo "✅ Dependencies setup completed"
+          EOF
+
+      # Step 12c: Start/Restart Application
+      - name: Start Application
+        timeout-minutes: 3
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o "ConnectTimeout=30" -o "ServerAliveInterval=10" -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }} << 'EOF'
+          set -e
+
+          cd /home/${USER}/Projects/htc/${{ vars.APP_NAME }}
+
+          echo "🔄 Managing PM2 process..."
+          if pm2 describe ${{ vars.APP_NAME }} > /dev/null 2>&1; then 
+            echo "Ứng dụng đang chạy, thực hiện restart..."
+            pm2 restart ${{ vars.APP_NAME }}
+          else 
+            echo "Ứng dụng chưa được khởi động, thực hiện start..."
+            pm2 start pm2.config.js
+          fi
+
+          echo "💾 Saving PM2 configuration..."
+          pm2 save
+
+          echo "⏳ Waiting for application stability..."
+          sleep 5
+
+          echo "✅ Application started successfully"
+          EOF
+
+      # Step 12d: Verify Deployment
+      - name: Verify Deployment
+        timeout-minutes: 2
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o "ConnectTimeout=30" -o "ServerAliveInterval=10" -o "ProxyCommand=cloudflared access ssh --hostname ${{ secrets.SSH_HOSTNAME }}" ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOSTNAME }} << 'EOF'
+          set -e
+
+          echo "🩺 Performing health check..."
+
+          # Check PM2 status
+          if pm2 describe ${{ vars.APP_NAME }} | grep -q "online"; then
+            echo "✅ PM2 process is online"
+          else
+            echo "❌ PM2 process is not online"
+            pm2 describe ${{ vars.APP_NAME }}
+            exit 1
+          fi
+
+          # Check if process is actually running
+          if pm2 jlist | grep -q '"name":"${{ vars.APP_NAME }}".*"status":"online"'; then
+            echo "✅ Application is running and healthy"
+          else
+            echo "❌ Application health check failed"
+            pm2 logs ${{ vars.APP_NAME }} --lines 10
+            exit 1
+          fi
+
+          echo "🎉 Deployment verification completed successfully"
+          EOF
