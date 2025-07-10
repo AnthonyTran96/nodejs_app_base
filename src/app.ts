@@ -1,25 +1,28 @@
-import express, { Express } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
-import type { RequestHandler } from 'express';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import type { Express, RequestHandler } from 'express';
+import express from 'express';
+import helmet from 'helmet';
 import { Server } from 'http';
 
+import { config } from '@/config/environment';
+import { initializeRoutes, router } from '@/core';
+import { Container } from '@/core/container';
 import { ContainerSetup } from '@/core/container-setup';
 import { DatabaseConnection } from '@/database/connection';
-import { initializeRoutes, router } from '@/core';
-import { errorHandler } from '@/middleware/error-handler';
-import { requestLogger } from '@/middleware/request-logger';
-import { notFoundHandler } from '@/middleware/not-found-handler';
-import { config } from '@/config/environment';
-import { logger } from '@/utils/logger';
-import { MigrationManager } from '@/database/migrations/migration-manager';
 import { registerMigrations } from '@/database/migrations';
+import { MigrationManager } from '@/database/migrations/migration-manager';
+import { errorHandler } from '@/middleware/error-handler';
+import { notFoundHandler } from '@/middleware/not-found-handler';
+import { requestLogger } from '@/middleware/request-logger';
+import { WebSocketService } from '@/modules/websocket/websocket.service';
+import { logger } from '@/utils/logger';
 
 export class Application {
   private readonly app: Express;
   private readonly containerSetup: ContainerSetup;
+  private webSocketService?: WebSocketService;
 
   constructor() {
     this.app = express();
@@ -32,6 +35,9 @@ export class Application {
     await this.containerSetup.setupDependencies();
     this.setupRoutes();
     this.setupErrorHandling();
+
+    // Setup WebSocket service
+    this.setupWebSocket();
   }
 
   private async setupDatabase(): Promise<void> {
@@ -194,8 +200,27 @@ export class Application {
     this.app.use(errorHandler);
   }
 
+  private setupWebSocket(): void {
+    try {
+      const container = Container.getInstance();
+      this.webSocketService = container.get<WebSocketService>('WebSocketService');
+      logger.info('✅ WebSocket service ready for initialization');
+    } catch (error) {
+      logger.error('❌ Failed to setup WebSocket service:', error);
+      throw error;
+    }
+  }
+
   listen(port: number, callback?: () => void): Server {
-    return this.app.listen(port, callback);
+    const server = this.app.listen(port, callback);
+
+    // Initialize WebSocket server with HTTP server
+    if (this.webSocketService) {
+      this.webSocketService.initialize(server);
+      logger.info('🔌 WebSocket server initialized with HTTP server');
+    }
+
+    return server;
   }
 
   getApp(): Express {

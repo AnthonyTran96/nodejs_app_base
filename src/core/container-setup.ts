@@ -35,9 +35,9 @@ export class ContainerSetup {
     await import('@/modules/user/user.registry');
     await import('@/modules/auth/auth.registry');
     await import('@/modules/post/post.registry');
+    await import('@/modules/websocket/websocket.registry'); // 🔌 WebSocket module
 
     // 🎯 New modules can be added here by any developer
-    // await import('@/modules/post/post.registry');
     // await import('@/modules/product/product.registry');
     // await import('@/modules/order/order.registry');
   }

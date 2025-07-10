@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Client Demo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .connected {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .disconnected {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .message {
+        background-color: #f1f1f1;
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 3px;
+      }
+      input,
+      button {
+        padding: 8px;
+        margin: 5px;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .events {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔌 WebSocket Client Demo</h1>
+
+    <!-- Connection Status -->
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <!-- Controls -->
+    <div>
+      <button onclick="connect()">Connect</button>
+      <button onclick="disconnect()">Disconnect</button>
+      <button onclick="ping()">Ping</button>
+    </div>
+
+    <!-- Authentication -->
+    <div>
+      <h3>Authentication (Optional)</h3>
+      <input type="text" id="token" placeholder="JWT Token (optional)" style="width: 300px" />
+      <p><small>You can get a token by logging in via API first</small></p>
+    </div>
+
+    <!-- Room Management -->
+    <div>
+      <h3>Room Management</h3>
+      <input type="text" id="roomName" placeholder="Room name" value="general" />
+      <button onclick="joinRoom()">Join Room</button>
+      <button onclick="leaveRoom()">Leave Room</button>
+    </div>
+
+    <!-- Post Subscription -->
+    <div>
+      <h3>Post Subscription</h3>
+      <input type="number" id="postId" placeholder="Post ID" value="1" />
+      <button onclick="subscribeToPost()">Subscribe to Post</button>
+      <button onclick="unsubscribeFromPost()">Unsubscribe from Post</button>
+    </div>
+
+    <!-- Typing Indicator -->
+    <div>
+      <h3>Typing Indicator</h3>
+      <input type="number" id="typingPostId" placeholder="Post ID" value="1" />
+      <button onclick="startTyping()">Start Typing</button>
+      <button onclick="stopTyping()">Stop Typing</button>
+    </div>
+
+    <!-- Events Log -->
+    <h3>Events</h3>
+    <div id="events" class="events"></div>
+    <button onclick="clearEvents()">Clear Events</button>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+      let socket = null;
+      const statusDiv = document.getElementById('status');
+      const eventsDiv = document.getElementById('events');
+
+      function log(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+        if (type === 'error') div.style.color = 'red';
+        if (type === 'success') div.style.color = 'green';
+        if (type === 'warning') div.style.color = 'orange';
+        eventsDiv.appendChild(div);
+        eventsDiv.scrollTop = eventsDiv.scrollHeight;
+      }
+
+      function updateStatus(connected) {
+        if (connected) {
+          statusDiv.textContent = 'Connected';
+          statusDiv.className = 'status connected';
+        } else {
+          statusDiv.textContent = 'Disconnected';
+          statusDiv.className = 'status disconnected';
+        }
+      }
+
+      function connect() {
+        if (socket) {
+          log('Already connected', 'warning');
+          return;
+        }
+
+        const token = document.getElementById('token').value;
+        const auth = token ? { token } : {};
+
+        socket = io('http://localhost:8080', {
+          auth,
+          transports: ['websocket', 'polling'],
+        });
+
+        // Connection events
+        socket.on('connect', () => {
+          log('✅ Connected to WebSocket server', 'success');
+          updateStatus(true);
+        });
+
+        socket.on('disconnect', reason => {
+          log(`❌ Disconnected: ${reason}`, 'error');
+          updateStatus(false);
+        });
+
+        socket.on('connect_error', error => {
+          log(`❌ Connection error: ${error.message}`, 'error');
+          updateStatus(false);
+        });
+
+        // Server events
+        socket.on('userJoined', data => {
+          log(`👤 User joined: ${data.name} (ID: ${data.userId})`, 'info');
+        });
+
+        socket.on('userLeft', data => {
+          log(`👤 User left: ${data.name} (ID: ${data.userId})`, 'info');
+        });
+
+        socket.on('postCreated', data => {
+          log(`📝 New post created: "${data.post.title}" by ${data.author}`, 'success');
+        });
+
+        socket.on('postUpdated', data => {
+          log(`📝 Post updated: "${data.post.title}" by ${data.author}`, 'info');
+        });
+
+        socket.on('postDeleted', data => {
+          log(`📝 Post deleted: ID ${data.postId} by ${data.author}`, 'warning');
+        });
+
+        socket.on('notification', data => {
+          log(`🔔 Notification: ${data.message}`, data.type);
+        });
+
+        socket.on('connectionCount', count => {
+          log(`👥 Total connections: ${count}`, 'info');
+        });
+
+        socket.on('typing', data => {
+          const action = data.isTyping ? 'started' : 'stopped';
+          log(`⌨️ ${data.userName} ${action} typing in post ${data.postId}`, 'info');
+        });
+      }
+
+      function disconnect() {
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+          log('Disconnected manually', 'warning');
+          updateStatus(false);
+        }
+      }
+
+      function ping() {
+        if (socket) {
+          socket.emit('ping');
+          log('📡 Ping sent', 'info');
+        } else {
+          log('Not connected', 'error');
+        }
+      }
+
+      function joinRoom() {
+        const room = document.getElementById('roomName').value;
+        if (socket && room) {
+          socket.emit('joinRoom', room);
+          log(`🚪 Joining room: ${room}`, 'info');
+        } else {
+          log('Not connected or room name empty', 'error');
+        }
+      }
+
+      function leaveRoom() {
+        const room = document.getElementById('roomName').value;
+        if (socket && room) {
+          socket.emit('leaveRoom', room);
+          log(`🚪 Leaving room: ${room}`, 'warning');
+        } else {
+          log('Not connected or room name empty', 'error');
+        }
+      }
+
+      function subscribeToPost() {
+        const postId = parseInt(document.getElementById('postId').value);
+        if (socket && postId) {
+          socket.emit('subscribeToPost', postId);
+          log(`📝 Subscribed to post: ${postId}`, 'success');
+        } else {
+          log('Not connected or invalid post ID', 'error');
+        }
+      }
+
+      function unsubscribeFromPost() {
+        const postId = parseInt(document.getElementById('postId').value);
+        if (socket && postId) {
+          socket.emit('unsubscribeFromPost', postId);
+          log(`📝 Unsubscribed from post: ${postId}`, 'warning');
+        } else {
+          log('Not connected or invalid post ID', 'error');
+        }
+      }
+
+      function startTyping() {
+        const postId = parseInt(document.getElementById('typingPostId').value);
+        if (socket && postId) {
+          socket.emit('typing', { postId, isTyping: true });
+          log(`⌨️ Started typing in post: ${postId}`, 'info');
+        } else {
+          log('Not connected or invalid post ID', 'error');
+        }
+      }
+
+      function stopTyping() {
+        const postId = parseInt(document.getElementById('typingPostId').value);
+        if (socket && postId) {
+          socket.emit('typing', { postId, isTyping: false });
+          log(`⌨️ Stopped typing in post: ${postId}`, 'info');
+        } else {
+          log('Not connected or invalid post ID', 'error');
+        }
+      }
+
+      function clearEvents() {
+        eventsDiv.innerHTML = '';
+      }
+    </script>
+  </body>
+</html>

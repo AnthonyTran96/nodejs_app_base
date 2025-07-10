@@ -366,7 +366,11 @@ export class ContainerSetup {
     await import('@/core/core.registry');
     await import('@/modules/user/user.registry');
     await import('@/modules/auth/auth.registry');
-    // 🎯 New modules: just add one line!
+    await import('@/modules/websocket/websocket.registry'); // 🔌 WebSocket module
+
+    // 🎯 New modules can be added here by any developer
+    // await import('@/modules/product/product.registry');
+    // await import('@/modules/order/order.registry');
   }
 }
 ```
@@ -782,6 +786,195 @@ npm run test:unit
 npm run test:integration
 npm run test:e2e
 ```
+
+## 🚀 CI/CD Pipeline
+
+The project includes a comprehensive **GitHub Actions CI/CD pipeline** that automates the entire deployment process with enhanced error handling and debugging capabilities.
+
+### Pipeline Architecture
+
+```
+Build & Test → Package → Deploy → Verify
+     ↓
+┌─ Checkout & Setup
+├─ Install Dependencies
+├─ Lint Check
+├─ Build Application
+├─ Optimize for Production
+├─ Package & Upload
+└─ Multi-Step Deployment:
+   ├─ 12a: Deploy Files (5 min timeout)
+   ├─ 12b: Setup Dependencies (10 min timeout)
+   ├─ 12c: Start Application (3 min timeout)
+   └─ 12d: Verify Deployment (2 min timeout)
+```
+
+### Deployment Steps Breakdown
+
+#### **Step 12a: Deploy Files to Server** (5 minutes)
+
+- ✅ Unzip and deploy application files
+- ✅ Create automatic backup of existing application
+- ✅ Environment configuration setup
+- ✅ File permission and ownership management
+
+#### **Step 12b: Setup Dependencies** (10 minutes)
+
+- ✅ SQLite module compatibility check with timeout
+- ✅ Production dependencies installation (`yarn install --omit=dev`)
+- ✅ Native module verification
+- ✅ Optimized for production environment
+
+#### **Step 12c: Start Application** (3 minutes)
+
+- ✅ PM2 process management (restart existing or start new)
+- ✅ Configuration persistence with `pm2 save`
+- ✅ Application stability verification
+- ✅ Graceful startup with health monitoring
+
+#### **Step 12d: Verify Deployment** (2 minutes)
+
+- ✅ PM2 process status verification
+- ✅ Application health check
+- ✅ Log output analysis for errors
+- ✅ Deployment success confirmation
+
+### Infrastructure Features
+
+#### **Cloudflare Tunnel Integration**
+
+- 🔒 **Secure SSH**: All connections via Cloudflare Access
+- 🌐 **Zero Trust**: No direct server exposure
+- ⚡ **ARM64 Optimized**: Native cloudflared for ARM64 runners
+
+#### **Enhanced SSH Configuration**
+
+- ⏱️ **Connection Timeout**: 30 seconds for quick failure detection
+- 💓 **Keep-Alive**: 10-second intervals to maintain connection
+- 🔐 **ED25519 Keys**: Modern cryptography for enhanced security
+
+#### **Production Optimization**
+
+- 📦 **Dependency Pruning**: Removes dev dependencies for smaller deployment
+- 🗜️ **Native Module Check**: Ensures compatibility across environments
+- 🔄 **Zero-Downtime**: Graceful restart with backup capability
+
+### Deployment Triggers
+
+```yaml
+# Automatic deployment on push to auto-build branch
+on:
+  push:
+    branches:
+      - auto-build
+```
+
+### Environment Requirements
+
+#### **GitHub Secrets** (Required)
+
+```bash
+SSH_PRIVATE_KEY     # ED25519 private key for server access
+SSH_HOSTNAME        # Cloudflare tunnel hostname
+SSH_USER           # Server username
+SSH_FINGERPRINT    # Server host key fingerprint
+```
+
+#### **GitHub Variables** (Required)
+
+```bash
+APP_NAME           # Application name for deployment paths
+```
+
+### Monitoring & Debugging
+
+#### **Enhanced Logging**
+
+- 🎯 **Step-by-step progress** with emoji indicators
+- ⏱️ **Timeout monitoring** for each deployment phase
+- 🔍 **Detailed error reporting** with specific failure points
+- 📊 **Performance tracking** with execution times
+
+#### **Failure Detection**
+
+- ❌ **Fast failure** with specific timeouts per step
+- 🔄 **Automatic rollback** on critical failures
+- 📋 **Health verification** before deployment completion
+- 📜 **Log analysis** for troubleshooting
+
+### Example Deployment Flow
+
+```bash
+# 1. Developer pushes to auto-build branch
+git push origin auto-build
+
+# 2. GitHub Actions pipeline triggers:
+🔄 Checkout repository (9s)
+⚙️ Setup Node.js 20 (5s)
+🔐 Configure SSH access (0s)
+🌐 Setup Cloudflare tunnel (59s)
+📦 Install dependencies (21s)
+✅ Lint check (1s)
+🏗️ Build application (3s)
+🗜️ Optimize production bundle (7s)
+📤 Upload to server (22s)
+
+# 3. Multi-step deployment:
+🚀 Deploy Files (30-60s)
+📦 Setup Dependencies (1-3 min)
+🔄 Start Application (30-60s)
+🩺 Verify Deployment (10-20s)
+
+# 4. Total deployment time: 3-5 minutes
+```
+
+### Deployment Best Practices
+
+#### **✅ Recommended Practices**
+
+1. **Branch Protection**: Only deploy from `auto-build` branch
+2. **Testing First**: Ensure all tests pass before deployment
+3. **Rollback Plan**: Automatic backup created before each deployment
+4. **Health Monitoring**: Verify application status after deployment
+5. **Environment Isolation**: Use separate configurations for dev/prod
+
+#### **🚨 Troubleshooting Common Issues**
+
+```bash
+# SSH connection timeout
+- Check Cloudflare tunnel configuration
+- Verify SSH_HOSTNAME and credentials
+
+# Dependencies installation hanging
+- Check network connectivity on server
+- Verify yarn.lock file integrity
+
+# PM2 process management issues
+- Check application logs: pm2 logs APP_NAME
+- Verify PM2 configuration file
+
+# Application health check failures
+- Check server resources (memory, CPU)
+- Verify database connectivity
+- Review application startup logs
+```
+
+### Local Development vs Production
+
+#### **Development Environment**
+
+- 🔧 SQLite database with auto-migrations
+- 🔥 Hot reload with nodemon
+- 📝 Debug logging enabled
+- 🌐 Auto-CORS configuration
+
+#### **Production Deployment**
+
+- 🗄️ PostgreSQL database (recommended)
+- ⚡ PM2 process management
+- 📊 Structured logging (JSON format)
+- 🔒 Secure CORS with explicit origins
+- 🗜️ Optimized bundle without dev dependencies
 
 ## 🛡️ Authentication & Authorization
 
