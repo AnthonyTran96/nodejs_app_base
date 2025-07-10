@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { config } from '@/config/environment';
 import { Service } from '@/core/container';
 
+import { TerminalService } from '@/modules/websocket/terminal.service';
 import {
   AuthenticatedSocket,
   ClientToServerEvents,
@@ -29,9 +30,7 @@ export class WebSocketService implements IWebSocketService {
   private rooms = new Map<string, RoomInfo>();
   private userSockets = new Map<number, Set<string>>(); // userId -> Set of socketIds
 
-  constructor() {
-    // Service will be initialized when server starts
-  }
+  constructor(private readonly terminalService: TerminalService) {}
 
   /**
    * Initialize WebSocket server with HTTP server
@@ -192,6 +191,127 @@ export class WebSocketService implements IWebSocketService {
       }
     });
 
+    // Terminal events
+    socket.on(
+      'terminalCreate',
+      async (options: { cols?: number; rows?: number; shell?: string }) => {
+        try {
+          const terminalOptions = {
+            ...options,
+            ...(socket.data.userId !== undefined && { userId: socket.data.userId }),
+            ...(socket.data.userName !== undefined && { userName: socket.data.userName }),
+          };
+
+          const terminal = await this.terminalService.createTerminal(terminalOptions);
+
+          // Join terminal room for this specific terminal
+          await this.joinRoom(socket, `terminal:${terminal.id}`);
+
+          socket.emit('terminalCreated', {
+            terminalId: terminal.id,
+            cols: terminal.cols,
+            rows: terminal.rows,
+          });
+
+          // Setup terminal data handler for real terminals
+          this.terminalService.setupTerminalDataHandler(terminal.id, (data: string) => {
+            socket.emit('terminalData', { terminalId: terminal.id, data });
+          });
+
+          // Send welcome message for simulated terminals
+          const welcomeMessage = this.terminalService.getWelcomeMessage(terminal.id);
+          if (welcomeMessage) {
+            socket.emit('terminalData', { terminalId: terminal.id, data: welcomeMessage });
+          }
+
+          logger.debug('Terminal created via WebSocket', {
+            terminalId: terminal.id,
+            userId: socket.data.userId,
+            socketId: socket.id,
+          });
+        } catch (error) {
+          socket.emit('terminalError', {
+            terminalId: '',
+            error: error instanceof Error ? error.message : 'Failed to create terminal',
+          });
+        }
+      }
+    );
+
+    socket.on('terminalInput', async (data: { terminalId: string; input: string }) => {
+      try {
+        const response = await this.terminalService.writeToTerminal(data.terminalId, data.input);
+
+        // For simulated terminals, send response immediately
+        if (response) {
+          socket.emit('terminalData', { terminalId: data.terminalId, data: response });
+        }
+      } catch (error) {
+        socket.emit('terminalError', {
+          terminalId: data.terminalId,
+          error: error instanceof Error ? error.message : 'Failed to write to terminal',
+        });
+      }
+    });
+
+    socket.on(
+      'terminalResize',
+      async (data: { terminalId: string; cols: number; rows: number }) => {
+        try {
+          await this.terminalService.resizeTerminal(data.terminalId, data.cols, data.rows);
+        } catch (error) {
+          socket.emit('terminalError', {
+            terminalId: data.terminalId,
+            error: error instanceof Error ? error.message : 'Failed to resize terminal',
+          });
+        }
+      }
+    );
+
+    socket.on('terminalDestroy', async (terminalId: string) => {
+      try {
+        const success = await this.terminalService.destroyTerminal(terminalId);
+        if (success) {
+          // Leave terminal room
+          await this.leaveRoom(socket, `terminal:${terminalId}`);
+
+          socket.emit('terminalDestroyed', { terminalId });
+        }
+      } catch (error) {
+        socket.emit('terminalError', {
+          terminalId,
+          error: error instanceof Error ? error.message : 'Failed to destroy terminal',
+        });
+      }
+    });
+
+    socket.on('terminalList', () => {
+      try {
+        const userTerminals = socket.data.userId
+          ? this.terminalService.getUserTerminals(socket.data.userId)
+          : [];
+
+        const terminals = userTerminals.map(terminal => ({
+          id: terminal.id,
+          pid: terminal.process?.pid,
+          shell: terminal.shell,
+          cols: terminal.cols,
+          rows: terminal.rows,
+          createdAt: terminal.createdAt,
+          status: terminal.status,
+          ...(terminal.userId !== undefined && { userId: terminal.userId }),
+          ...(terminal.userName !== undefined && { userName: terminal.userName }),
+        }));
+
+        socket.emit('terminalList', { terminals });
+      } catch (error) {
+        socket.emit('terminalError', {
+          terminalId: '',
+          error: error instanceof Error ? error.message : 'Failed to list terminals',
+        });
+      }
+    });
+
     // Ping/pong for connection monitoring
     socket.on('ping', () => {
       socket.emit('notification', {
@@ -215,6 +335,22 @@ export class WebSocketService implements IWebSocketService {
     const connectionInfo = this.connections.get(socket.id);
 
     if (connectionInfo) {
+      // Cleanup user terminals on disconnect
+      if (connectionInfo.userId) {
+        const userTerminals = this.terminalService.getUserTerminals(connectionInfo.userId);
+        for (const terminal of userTerminals) {
+          // Only destroy terminals if this is the last connection for the user
+          const userSocketSet = this.userSockets.get(connectionInfo.userId);
+          if (userSocketSet && userSocketSet.size === 1) {
+            await this.terminalService.destroyTerminal(terminal.id);
+            logger.debug('Terminal destroyed on disconnect', {
+              terminalId: terminal.id,
+              userId: connectionInfo.userId,
+            });
+          }
+        }
+      }
+
       // Remove from user connections tracking
       if (connectionInfo.userId) {
         const userSocketSet = this.userSockets.get(connectionInfo.userId);
@@ -460,11 +596,12 @@ export class WebSocketService implements IWebSocketService {
   /**
    * Helper: Determine room type from room name
    */
-  private getRoomType(room: string): 'general' | 'post' | 'user' | 'admin' {
+  private getRoomType(room: string): 'general' | 'post' | 'user' | 'admin' | 'terminal' {
     if (room === 'general') return 'general';
     if (room.startsWith('post:')) return 'post';
     if (room.startsWith('user:')) return 'user';
     if (room.startsWith('admin:')) return 'admin';
+    if (room.startsWith('terminal:')) return 'terminal';
     return 'general';
   }
 }

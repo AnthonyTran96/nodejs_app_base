@@ -17,6 +17,13 @@ export interface ServerToClientEvents {
 
   // Typing events
   typing: (data: { postId: number; isTyping: boolean; userId?: number; userName?: string }) => void;
+
+  // Terminal events
+  terminalData: (data: { terminalId: string; data: string }) => void;
+  terminalCreated: (data: { terminalId: string; cols: number; rows: number }) => void;
+  terminalDestroyed: (data: { terminalId: string }) => void;
+  terminalError: (data: { terminalId: string; error: string }) => void;
+  terminalList: (data: { terminals: TerminalInfo[] }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -33,6 +40,13 @@ export interface ClientToServerEvents {
 
   // Ping for connection monitoring
   ping: () => void;
+
+  // Terminal events
+  terminalCreate: (options: { cols?: number; rows?: number; shell?: string }) => void;
+  terminalInput: (data: { terminalId: string; input: string }) => void;
+  terminalResize: (data: { terminalId: string; cols: number; rows: number }) => void;
+  terminalDestroy: (terminalId: string) => void;
+  terminalList: () => void;
 }
 
 export interface InterServerEvents {
@@ -71,7 +85,7 @@ export interface RoomInfo {
   name: string;
   users: number[];
   createdAt: Date;
-  type: 'general' | 'post' | 'user' | 'admin';
+  type: 'general' | 'post' | 'user' | 'admin' | 'terminal';
 }
 
 // WebSocket events for business logic
@@ -107,4 +121,39 @@ export interface IWebSocketService {
 // WebSocket middleware for authentication
 export interface WebSocketAuthMiddleware {
   (socket: AuthenticatedSocket, next: (err?: Error) => void): void;
+}
+
+// Terminal-specific types
+export interface TerminalInfo {
+  id: string;
+  pid?: number;
+  shell: string;
+  cols: number;
+  rows: number;
+  createdAt: Date;
+  userId?: number;
+  userName?: string;
+  status: 'running' | 'stopped' | 'error';
+}
+
+export interface TerminalSession {
+  id: string;
+  process?: any; // Will be node-pty IPty when available
+  userId?: number;
+  userName?: string;
+  shell: string;
+  cols: number;
+  rows: number;
+  createdAt: Date;
+  lastActivity: Date;
+  status: 'running' | 'stopped' | 'error';
+  simulatedProcess?: SimulatedTerminal; // For simulation when node-pty is not available
+}
+
+export interface SimulatedTerminal {
+  id: string;
+  currentDirectory: string;
+  environment: Record<string, string>;
+  history: string[];
+  commandCounter: number;
 }

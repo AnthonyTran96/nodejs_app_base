@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Terminal Demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #1e1e1e;
+        color: #fff;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .controls {
+        background: #2d2d2d;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .status {
+        background: #2d2d2d;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+
+      .terminal-container {
+        background: #000;
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 10px;
+        min-height: 400px;
+        position: relative;
+      }
+
+      button {
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      button:hover {
+        background: #005a9e;
+      }
+
+      button:disabled {
+        background: #666;
+        cursor: not-allowed;
+      }
+
+      .btn-danger {
+        background: #dc3545;
+      }
+
+      .btn-danger:hover {
+        background: #c82333;
+      }
+
+      input,
+      select {
+        padding: 8px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: #333;
+        color: white;
+        margin-right: 10px;
+      }
+
+      .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      .status-connected {
+        background: #28a745;
+      }
+
+      .status-disconnected {
+        background: #dc3545;
+      }
+
+      .terminal-info {
+        background: #2d2d2d;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        font-size: 12px;
+      }
+
+      .error {
+        color: #ff6b6b;
+        font-weight: bold;
+      }
+
+      .success {
+        color: #51cf66;
+        font-weight: bold;
+      }
+
+      .info {
+        color: #74c0fc;
+      }
+
+      .logs {
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        margin-top: 20px;
+      }
+
+      .log-entry {
+        margin-bottom: 5px;
+        border-left: 3px solid #666;
+        padding-left: 8px;
+      }
+
+      .log-entry.error {
+        border-left-color: #dc3545;
+      }
+
+      .log-entry.success {
+        border-left-color: #28a745;
+      }
+
+      .log-entry.info {
+        border-left-color: #17a2b8;
+      }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🖥️ WebSocket Terminal Demo</h1>
+        <p>Interactive terminal using Socket.io + xterm.js</p>
+      </div>
+
+      <div class="status">
+        <span class="status-indicator" id="connectionStatus"></span>
+        <span id="statusText">Disconnected</span>
+        <span style="margin-left: 20px">Terminal ID: <span id="terminalId">None</span></span>
+        <span style="margin-left: 20px">Size: <span id="terminalSize">80x24</span></span>
+      </div>
+
+      <div class="controls">
+        <input type="text" id="serverUrl" placeholder="Server URL" value="http://localhost:8080" />
+        <input type="text" id="authToken" placeholder="JWT Token (optional)" />
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+
+        <select id="shellSelect">
+          <option value="">Default Shell</option>
+          <option value="/bin/bash">bash</option>
+          <option value="/bin/sh">sh</option>
+          <option value="/bin/zsh">zsh</option>
+          <option value="cmd.exe">cmd</option>
+          <option value="powershell.exe">PowerShell</option>
+        </select>
+
+        <input type="number" id="colsInput" placeholder="Cols" value="80" min="20" max="200" />
+        <input type="number" id="rowsInput" placeholder="Rows" value="24" min="5" max="100" />
+
+        <button id="createTerminalBtn" disabled>Create Terminal</button>
+        <button id="destroyTerminalBtn" disabled>Destroy Terminal</button>
+        <button id="listTerminalsBtn" disabled>List Terminals</button>
+        <button id="clearLogsBtn">Clear Logs</button>
+      </div>
+
+      <div class="terminal-info" id="terminalInfo" style="display: none">
+        <strong>Terminal Information:</strong>
+        <div id="terminalDetails"></div>
+      </div>
+
+      <div class="terminal-container">
+        <div id="terminal"></div>
+      </div>
+
+      <div class="logs">
+        <h4>Event Logs</h4>
+        <div id="logContainer"></div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
+
+    <script>
+      class TerminalDemo {
+        constructor() {
+          this.socket = null;
+          this.terminal = null;
+          this.fitAddon = null;
+          this.currentTerminalId = null;
+          this.isConnected = false;
+
+          this.initializeTerminal();
+          this.bindEvents();
+          this.updateUI();
+        }
+
+        initializeTerminal() {
+          // Initialize xterm.js
+          this.terminal = new Terminal({
+            fontSize: 14,
+            fontFamily:
+              '"Cascadia Code", "Fira Code", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+            theme: {
+              background: '#000000',
+              foreground: '#ffffff',
+              cursor: '#ffffff',
+              selection: '#ffffff40',
+            },
+            cursorBlink: true,
+            cursorStyle: 'block',
+            scrollback: 1000,
+            tabStopWidth: 4,
+          });
+
+          this.fitAddon = new FitAddon.FitAddon();
+          this.terminal.loadAddon(this.fitAddon);
+
+          this.terminal.open(document.getElementById('terminal'));
+          this.fitAddon.fit();
+
+          // Handle terminal input
+          this.terminal.onData(data => {
+            if (this.socket && this.currentTerminalId) {
+              this.socket.emit('terminalInput', {
+                terminalId: this.currentTerminalId,
+                input: data,
+              });
+            }
+          });
+
+          // Handle terminal resize
+          this.terminal.onResize(size => {
+            if (this.socket && this.currentTerminalId) {
+              this.socket.emit('terminalResize', {
+                terminalId: this.currentTerminalId,
+                cols: size.cols,
+                rows: size.rows,
+              });
+              this.updateTerminalSize(size.cols, size.rows);
+            }
+          });
+
+          // Fit terminal on window resize
+          window.addEventListener('resize', () => {
+            this.fitAddon.fit();
+          });
+
+          // Welcome message
+          this.terminal.writeln('🖥️  WebSocket Terminal Demo');
+          this.terminal.writeln('Connect to server and create a terminal to get started.');
+          this.terminal.writeln('');
+        }
+
+        bindEvents() {
+          document.getElementById('connectBtn').addEventListener('click', () => this.connect());
+          document
+            .getElementById('disconnectBtn')
+            .addEventListener('click', () => this.disconnect());
+          document
+            .getElementById('createTerminalBtn')
+            .addEventListener('click', () => this.createTerminal());
+          document
+            .getElementById('destroyTerminalBtn')
+            .addEventListener('click', () => this.destroyTerminal());
+          document
+            .getElementById('listTerminalsBtn')
+            .addEventListener('click', () => this.listTerminals());
+          document.getElementById('clearLogsBtn').addEventListener('click', () => this.clearLogs());
+        }
+
+        connect() {
+          const serverUrl = document.getElementById('serverUrl').value;
+          const authToken = document.getElementById('authToken').value;
+
+          if (!serverUrl) {
+            this.addLog('Please enter a server URL', 'error');
+            return;
+          }
+
+          this.addLog(`Connecting to ${serverUrl}...`, 'info');
+
+          const options = {
+            forceNew: true,
+            transports: ['websocket', 'polling'],
+          };
+
+          if (authToken) {
+            options.auth = { token: authToken };
+          }
+
+          this.socket = io(serverUrl, options);
+
+          this.socket.on('connect', () => {
+            this.isConnected = true;
+            this.addLog('Connected to server', 'success');
+            this.updateUI();
+            this.setupSocketEvents();
+          });
+
+          this.socket.on('disconnect', reason => {
+            this.isConnected = false;
+            this.currentTerminalId = null;
+            this.addLog(`Disconnected: ${reason}`, 'error');
+            this.updateUI();
+          });
+
+          this.socket.on('connect_error', error => {
+            this.addLog(`Connection error: ${error.message}`, 'error');
+            this.updateUI();
+          });
+        }
+
+        setupSocketEvents() {
+          // Terminal events
+          this.socket.on('terminalCreated', data => {
+            this.currentTerminalId = data.terminalId;
+            this.addLog(`Terminal created: ${data.terminalId}`, 'success');
+            this.updateTerminalSize(data.cols, data.rows);
+            this.updateTerminalInfo(data);
+            this.terminal.clear();
+            this.terminal.writeln(`🚀 Terminal ${data.terminalId} created successfully!`);
+            this.terminal.writeln('Type "help" for available commands.');
+            this.terminal.writeln('');
+            this.updateUI();
+          });
+
+          this.socket.on('terminalData', data => {
+            if (data.terminalId === this.currentTerminalId) {
+              this.terminal.write(data.data);
+            }
+          });
+
+          this.socket.on('terminalDestroyed', data => {
+            if (data.terminalId === this.currentTerminalId) {
+              this.currentTerminalId = null;
+              this.addLog(`Terminal ${data.terminalId} destroyed`, 'info');
+              this.terminal.clear();
+              this.terminal.writeln('Terminal session ended.');
+              this.updateTerminalInfo(null);
+              this.updateUI();
+            }
+          });
+
+          this.socket.on('terminalError', data => {
+            this.addLog(`Terminal error: ${data.error}`, 'error');
+            this.terminal.writeln(`\r\n❌ Error: ${data.error}\r\n`);
+          });
+
+          this.socket.on('terminalList', data => {
+            this.addLog(`Available terminals: ${data.terminals.length}`, 'info');
+
+            if (data.terminals.length === 0) {
+              this.terminal.writeln('\r\nNo terminals available.\r\n');
+            } else {
+              this.terminal.writeln('\r\n📋 Available terminals:');
+              data.terminals.forEach(term => {
+                this.terminal.writeln(
+                  `  • ${term.id} (${term.shell}) - ${term.status} - ${term.cols}x${term.rows}`
+                );
+              });
+              this.terminal.writeln('');
+            }
+          });
+
+          // General events
+          this.socket.on('notification', data => {
+            this.addLog(`Notification: ${data.message}`, data.type || 'info');
+          });
+
+          this.socket.on('connectionCount', count => {
+            this.addLog(`Active connections: ${count}`, 'info');
+          });
+        }
+
+        createTerminal() {
+          if (!this.socket || !this.isConnected) {
+            this.addLog('Not connected to server', 'error');
+            return;
+          }
+
+          const shell = document.getElementById('shellSelect').value || undefined;
+          const cols = parseInt(document.getElementById('colsInput').value) || 80;
+          const rows = parseInt(document.getElementById('rowsInput').value) || 24;
+
+          this.addLog(
+            `Creating terminal (${shell || 'default shell'}, ${cols}x${rows})...`,
+            'info'
+          );
+
+          this.socket.emit('terminalCreate', { shell, cols, rows });
+        }
+
+        destroyTerminal() {
+          if (!this.socket || !this.currentTerminalId) {
+            this.addLog('No active terminal to destroy', 'error');
+            return;
+          }
+
+          this.addLog(`Destroying terminal ${this.currentTerminalId}...`, 'info');
+          this.socket.emit('terminalDestroy', this.currentTerminalId);
+        }
+
+        listTerminals() {
+          if (!this.socket || !this.isConnected) {
+            this.addLog('Not connected to server', 'error');
+            return;
+          }
+
+          this.addLog('Requesting terminal list...', 'info');
+          this.socket.emit('terminalList');
+        }
+
+        disconnect() {
+          if (this.socket) {
+            this.socket.disconnect();
+            this.socket = null;
+          }
+          this.isConnected = false;
+          this.currentTerminalId = null;
+          this.updateUI();
+        }
+
+        updateUI() {
+          const connectBtn = document.getElementById('connectBtn');
+          const disconnectBtn = document.getElementById('disconnectBtn');
+          const createTerminalBtn = document.getElementById('createTerminalBtn');
+          const destroyTerminalBtn = document.getElementById('destroyTerminalBtn');
+          const listTerminalsBtn = document.getElementById('listTerminalsBtn');
+          const statusIndicator = document.getElementById('connectionStatus');
+          const statusText = document.getElementById('statusText');
+          const terminalIdSpan = document.getElementById('terminalId');
+
+          connectBtn.disabled = this.isConnected;
+          disconnectBtn.disabled = !this.isConnected;
+          createTerminalBtn.disabled = !this.isConnected || !!this.currentTerminalId;
+          destroyTerminalBtn.disabled = !this.currentTerminalId;
+          listTerminalsBtn.disabled = !this.isConnected;
+
+          if (this.isConnected) {
+            statusIndicator.className = 'status-indicator status-connected';
+            statusText.textContent = 'Connected';
+          } else {
+            statusIndicator.className = 'status-indicator status-disconnected';
+            statusText.textContent = 'Disconnected';
+          }
+
+          terminalIdSpan.textContent = this.currentTerminalId || 'None';
+        }
+
+        updateTerminalSize(cols, rows) {
+          document.getElementById('terminalSize').textContent = `${cols}x${rows}`;
+          document.getElementById('colsInput').value = cols;
+          document.getElementById('rowsInput').value = rows;
+        }
+
+        updateTerminalInfo(data) {
+          const terminalInfo = document.getElementById('terminalInfo');
+          const terminalDetails = document.getElementById('terminalDetails');
+
+          if (data) {
+            terminalInfo.style.display = 'block';
+            terminalDetails.innerHTML = `
+            <div>ID: ${data.terminalId}</div>
+            <div>Size: ${data.cols}x${data.rows}</div>
+            <div>Status: ${data.status || 'running'}</div>
+            <div>Created: ${new Date().toLocaleString()}</div>
+          `;
+          } else {
+            terminalInfo.style.display = 'none';
+          }
+        }
+
+        addLog(message, type = 'info') {
+          const logContainer = document.getElementById('logContainer');
+          const logEntry = document.createElement('div');
+          logEntry.className = `log-entry ${type}`;
+          logEntry.innerHTML = `<span style="color: #666;">[${new Date().toLocaleTimeString()}]</span> ${message}`;
+
+          logContainer.appendChild(logEntry);
+          logContainer.scrollTop = logContainer.scrollHeight;
+
+          // Keep only last 50 log entries
+          while (logContainer.children.length > 50) {
+            logContainer.removeChild(logContainer.firstChild);
+          }
+        }
+
+        clearLogs() {
+          document.getElementById('logContainer').innerHTML = '';
+        }
+      }
+
+      // Initialize demo when page loads
+      document.addEventListener('DOMContentLoaded', () => {
+        new TerminalDemo();
+      });
+    </script>
+  </body>
+</html>
