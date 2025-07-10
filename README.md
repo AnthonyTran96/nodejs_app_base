@@ -44,7 +44,10 @@ Application Bootstrap
 ✅ **Comprehensive Testing** (Unit, Integration, E2E)  
 ✅ **Code Quality** (ESLint + Prettier)  
 ✅ **Logging** with Winston  
-✅ **Environment Configuration** with validation
+✅ **Environment Configuration** with validation  
+✅ **CI/CD Pipeline** - Multi-step GitHub Actions deployment with Cloudflare Tunnel  
+✅ **Production Optimization** - Automated dependency pruning and PM2 management  
+✅ **Health Monitoring** - Automated deployment verification and rollback capability
 
 ## 📁 Project Structure
 
@@ -85,14 +88,27 @@ src/
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
 │   │   └── auth.registry.ts # 🔧 Auth module registration
-│   └── user/           # User management module
-│       ├── user.controller.ts
-│       ├── user.service.ts
-│       ├── user.repository.ts
-│       ├── user.dto.ts
-│       └── user.registry.ts # 🔧 User module registration
+│   ├── user/           # User management module
+│   │   ├── user.controller.ts
+│   │   ├── user.service.ts
+│   │   ├── user.repository.ts
+│   │   ├── user.dto.ts
+│   │   └── user.registry.ts # 🔧 User module registration
+│   ├── post/           # Post management module
+│   │   ├── post.controller.ts
+│   │   ├── post.service.ts
+│   │   ├── post.repository.ts
+│   │   ├── post.dto.ts
+│   │   └── post.registry.ts # 🔧 Post module registration
+│   └── websocket/      # 🔌 Real-time WebSocket module
+│       ├── websocket.service.ts
+│       ├── websocket.controller.ts
+│       └── websocket.registry.ts # 🔧 WebSocket module registration
 ├── models/             # Data models and interfaces
 └── app.ts              # Application setup (clean & focused)
+
+.github/workflows/      # 🚀 CI/CD Pipeline
+└── deploy-dev.yml      # Multi-step deployment with Cloudflare Tunnel
 
 tests/
 ├── unit/               # Unit tests
@@ -253,6 +269,105 @@ POST   /api/v1/users/change-password  # Change password
 GET    /api/v1/users/stats    # User statistics (admin only)
 ```
 
+### Posts (Authentication Required)
+
+```bash
+GET    /api/v1/posts          # List posts with filtering
+GET    /api/v1/posts/:id      # Get post by ID
+POST   /api/v1/posts          # Create new post
+PUT    /api/v1/posts/:id      # Update post
+DELETE /api/v1/posts/:id      # Delete post (admin only)
+```
+
+### 🔌 WebSocket Real-Time Features
+
+#### HTTP Management Endpoints
+
+```bash
+GET    /api/v1/websocket/health              # WebSocket server health (public)
+GET    /api/v1/websocket/stats               # Server statistics (admin only)
+POST   /api/v1/websocket/notify/user         # Send notification to user (admin)
+POST   /api/v1/websocket/notify/broadcast    # Broadcast notification (admin)
+POST   /api/v1/websocket/notify/room         # Send notification to room (admin)
+GET    /api/v1/websocket/rooms/:room         # Get room information (admin)
+GET    /api/v1/websocket/users/:userId/connections  # Get user connections (admin)
+```
+
+#### WebSocket Events
+
+**Client → Server Events:**
+
+```javascript
+'joinRoom'; // Join specific room
+'leaveRoom'; // Leave room
+'subscribeToPost'; // Subscribe to post updates
+'unsubscribeFromPost'; // Unsubscribe from post
+'typing'; // Send typing indicator
+'ping'; // Ping server
+```
+
+**Server → Client Events:**
+
+```javascript
+'userJoined'; // User joined notification
+'userLeft'; // User left notification
+'postCreated'; // New post notification
+'postUpdated'; // Post updated notification
+'postDeleted'; // Post deleted notification
+'notification'; // General notifications
+'connectionCount'; // Live connection count
+'typing'; // Typing indicators
+```
+
+#### WebSocket Client Usage
+
+```javascript
+// Connect to WebSocket server
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000', {
+  auth: { token: 'your-jwt-token' }, // Optional authentication
+  transports: ['websocket', 'polling'],
+});
+
+// Listen for real-time post updates
+socket.on('postCreated', data => {
+  console.log(`📝 New post: "${data.post.title}" by ${data.author}`);
+});
+
+// Join a room for targeted notifications
+socket.emit('joinRoom', 'general');
+
+// Subscribe to specific post updates
+socket.emit('subscribeToPost', 123);
+
+// Send typing indicators
+socket.emit('typing', { postId: 123, isTyping: true });
+```
+
+**Key Features:**
+
+- ✅ **JWT Authentication**: Secure WebSocket connections
+- ✅ **Real-time Post Updates**: Instant notifications for CRUD operations
+- ✅ **Room Management**: Organize users into topic-based rooms
+- ✅ **Typing Indicators**: Show when users are typing
+- ✅ **User Presence**: Track user join/leave events
+- ✅ **Admin Monitoring**: Comprehensive stats and control endpoints
+- ✅ **Auto-Integration**: Works seamlessly with existing business logic
+
+#### Testing WebSocket Features
+
+```bash
+# Start development server
+npm run dev
+
+# Open the WebSocket demo client
+open websocket-client-demo.html
+
+# Or test via API endpoints
+curl http://localhost:3000/api/v1/websocket/health
+```
+
 ### API Documentation
 
 ```bash
@@ -279,6 +394,124 @@ npm run test:coverage
 # Run in watch mode
 npm run test:watch
 ```
+
+## 🚀 CI/CD Pipeline
+
+This project includes a **production-ready GitHub Actions CI/CD pipeline** with enhanced error handling and multi-step deployment process.
+
+### Pipeline Features
+
+- ✅ **Multi-Step Deployment**: Separated deployment phases for better debugging
+- ✅ **Cloudflare Tunnel**: Secure server access without direct exposure
+- ✅ **ARM64 Optimized**: Native performance on ARM64 GitHub runners
+- ✅ **Health Monitoring**: Automated verification and rollback capability
+- ✅ **Production Optimization**: Dependency pruning and PM2 management
+- ✅ **Enhanced Logging**: Step-by-step progress with emoji indicators
+
+### Deployment Process
+
+```bash
+# Automatic deployment triggered by:
+git push origin auto-build
+
+# Pipeline stages:
+1. Build & Test (2-3 minutes)
+   ├─ Code checkout & Node.js setup
+   ├─ Dependencies installation
+   ├─ ESLint code quality check
+   └─ TypeScript compilation
+
+2. Package & Upload (1 minute)
+   ├─ Production optimization
+   ├─ Native dependencies removal
+   └─ Secure file transfer via Cloudflare
+
+3. Multi-Step Deployment (3-5 minutes)
+   ├─ 12a: Deploy Files (5 min timeout)
+   ├─ 12b: Setup Dependencies (10 min timeout)
+   ├─ 12c: Start Application (3 min timeout)
+   └─ 12d: Verify Deployment (2 min timeout)
+
+# Total deployment time: 6-9 minutes
+```
+
+### GitHub Configuration Required
+
+#### **Secrets** (Repository Settings → Secrets)
+
+```bash
+SSH_PRIVATE_KEY     # ED25519 private key for server access
+SSH_HOSTNAME        # Cloudflare tunnel hostname
+SSH_USER           # Server username
+SSH_FINGERPRINT    # Server host key fingerprint
+```
+
+#### **Variables** (Repository Settings → Variables)
+
+```bash
+APP_NAME           # Application name for deployment paths
+```
+
+### Deployment Monitoring
+
+The pipeline provides detailed monitoring with **emoji-based progress indicators**:
+
+```bash
+🚀 Starting file deployment...
+📦 Creating backup of existing application...
+📁 Moving new files...
+⚙️ Copying environment configuration...
+✅ Files deployed successfully
+
+🔍 Checking SQLite module...
+📦 Installing production dependencies...
+✅ Dependencies setup completed
+
+🔄 Managing PM2 process...
+💾 Saving PM2 configuration...
+⏳ Waiting for application stability...
+✅ Application started successfully
+
+🩺 Performing health check...
+✅ PM2 process is online
+✅ Application is running and healthy
+🎉 Deployment verification completed successfully
+```
+
+### Troubleshooting Pipeline Issues
+
+#### **Common Issues & Solutions**
+
+```bash
+# SSH Connection Timeout
+- Verify Cloudflare tunnel configuration
+- Check SSH_HOSTNAME and SSH_USER variables
+
+# Dependencies Installation Hanging
+- Network connectivity issues on server
+- Check yarn.lock file integrity
+- Review server disk space
+
+# PM2 Process Management Issues
+- Check application logs: pm2 logs APP_NAME
+- Verify pm2.config.js configuration
+- Review server memory/CPU resources
+
+# Health Check Failures
+- Database connectivity issues
+- Check environment variables on server
+- Review application startup logs
+```
+
+### Pipeline Benefits
+
+- 🔒 **Security**: All connections via Cloudflare Zero Trust
+- ⚡ **Performance**: ARM64-optimized with connection timeouts
+- 🔍 **Debugging**: Detailed logging and specific error reporting
+- 🔄 **Reliability**: Automatic backup and rollback capabilities
+- 📊 **Monitoring**: Real-time deployment status and health checks
+
+For complete CI/CD documentation, see **[docs/ONBOARDING.md](docs/ONBOARDING.md#-cicd-pipeline)**.
 
 ## 🔧 Development
 
@@ -544,7 +777,10 @@ Standardized API responses:
 ✅ **Documentation**: Comprehensive guides available  
 ✅ **PostgreSQL Support**: Production-ready database setup  
 ✅ **Environment Validation**: Safe configuration management  
-✅ **Centralized Routes**: All routes organized in src/routes/
+✅ **Centralized Routes**: All routes organized in src/routes/  
+✅ **CI/CD Pipeline**: Multi-step deployment with Cloudflare Tunnel  
+✅ **Production Deployment**: Automated optimization and health monitoring  
+✅ **Zero-Downtime**: Graceful restart with automatic backup and rollback
 
 ## 🤝 Contributing
 

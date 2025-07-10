@@ -13,7 +13,7 @@ ModuleRegistry.registerModule({
     container.register('PostRepository', PostRepository);
 
     container.register('PostService', PostService, {
-      dependencies: ['PostRepository', 'UnitOfWork'],
+      dependencies: ['PostRepository', 'UnitOfWork', 'WebSocketService'],
     });
 
     container.register('PostController', PostController, {

@@ -9,12 +9,17 @@ import {
   PostResponse,
   UpdatePostRequest,
 } from '@/models/post.model';
+import { WebSocketService } from '@/modules/websocket/websocket.service';
 import { PaginatedResult, PaginationOptions } from '@/types/common';
+import { logger } from '@/utils/logger';
 import { PostRepository } from './post.repository';
 
 @Service('PostService')
 export class PostService {
-  constructor(private readonly postRepository: PostRepository) {}
+  constructor(
+    private readonly postRepository: PostRepository,
+    private readonly webSocketService: WebSocketService
+  ) {}
 
   async findByFilter(
     filter: PostFilter = {},
@@ -49,8 +54,24 @@ export class PostService {
 
   async create(postData: CreatePostRequest): Promise<PostResponse> {
     const post = await this.postRepository.create(postData);
+    const postResponse = this.toPostResponse(post);
 
-    return this.toPostResponse(post);
+    try {
+      // Get author information for WebSocket notification
+      const fullPost = await this.postRepository.findFullPostById(post.id);
+      if (fullPost) {
+        await this.webSocketService.notifyPostCreated(postResponse, fullPost.author.name);
+        logger.debug('WebSocket notification sent for new post', { postId: post.id });
+      }
+    } catch (error) {
+      // Don't fail the operation if WebSocket notification fails
+      logger.warn('Failed to send WebSocket notification for new post', {
+        postId: post.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    return postResponse;
   }
 
   async update(id: number, postData: UpdatePostRequest): Promise<PostResponse> {
@@ -64,11 +85,28 @@ export class PostService {
       throw new NotFoundError('Post not found');
     }
 
-    return this.toPostResponse(updatedPost);
+    const postResponse = this.toPostResponse(updatedPost);
+
+    try {
+      // Get author information for WebSocket notification
+      const fullPost = await this.postRepository.findFullPostById(id);
+      if (fullPost) {
+        await this.webSocketService.notifyPostUpdated(postResponse, fullPost.author.name);
+        logger.debug('WebSocket notification sent for updated post', { postId: id });
+      }
+    } catch (error) {
+      // Don't fail the operation if WebSocket notification fails
+      logger.warn('Failed to send WebSocket notification for updated post', {
+        postId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    return postResponse;
   }
 
   async delete(id: number): Promise<PostResponse> {
-    const existingFullPost = await this.postRepository.findById(id);
+    const existingFullPost = await this.postRepository.findFullPostById(id);
 
     if (!existingFullPost) {
       throw new NotFoundError('Post not found');
@@ -79,7 +117,20 @@ export class PostService {
       throw new InternalServerError('Cannot delete Post');
     }
 
-    return this.toPostResponse(existingFullPost);
+    const postResponse = this.toPostResponse(existingFullPost);
+
+    try {
+      await this.webSocketService.notifyPostDeleted(id, existingFullPost.author.name);
+      logger.debug('WebSocket notification sent for deleted post', { postId: id });
+    } catch (error) {
+      // Don't fail the operation if WebSocket notification fails
+      logger.warn('Failed to send WebSocket notification for deleted post', {
+        postId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
+    return postResponse;
   }
 
   private toPostResponse(post: Post): PostResponse {
