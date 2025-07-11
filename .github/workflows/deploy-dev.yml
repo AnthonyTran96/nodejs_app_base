@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - auto-build # Trigger workflow on push to auto-build
+      - auto-build-terminal # Trigger workflow on push to auto-build
 
 jobs:
   build-and-publish:
