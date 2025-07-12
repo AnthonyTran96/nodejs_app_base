@@ -26,6 +26,28 @@ describe('Posts E2E Tests', () => {
     container = Container.getInstance();
     userRepository = container.get<UserRepository>('UserRepository');
     postRepository = container.get<PostRepository>('PostRepository');
+    // Stub WebSocket plugins to prevent broadcast errors during E2E tests
+    try {
+      const wsService: any = container.get('WebSocketService');
+      wsService.io = {
+        to: () => ({ emit: () => {} }),
+        emit: () => {},
+      };
+    } catch {
+      // ignore if not available
+    }
+
+    // Stub PostWebSocketPlugin to prevent notification errors during E2E tests
+    try {
+      const postWebSocketPlugin: any = container.get('PostWebSocketPlugin');
+      if (postWebSocketPlugin) {
+        postWebSocketPlugin.notifyPostCreated = jest.fn();
+        postWebSocketPlugin.notifyPostUpdated = jest.fn();
+        postWebSocketPlugin.notifyPostDeleted = jest.fn();
+      }
+    } catch {
+      // ignore if not available
+    }
   });
 
   beforeEach(async () => {
