@@ -33,6 +33,11 @@ Application Bootstrap
 ✅ **DTO Validation** with class-validator  
 ✅ **Authentication** (JWT + cookies)  
 ✅ **Authorization** (enum-based role access control)  
+✅ **Real-time WebSocket System** - Socket.io with plugin architecture  
+✅ **WebSocket Authentication** - JWT token support with anonymous fallback  
+✅ **Plugin System** - Modular WebSocket event handling  
+✅ **Real-time Post Notifications** - Live updates for CRUD operations  
+✅ **Room Management** - Dynamic room creation and subscription  
 ✅ **Database Integration** (SQLite for dev, PostgreSQL for production)  
 ✅ **Repository Pattern** for data access  
 ✅ **DataTransformer Utility** - Reusable data transformation logic  
@@ -367,6 +372,126 @@ open websocket-client-demo.html
 # Or test via API endpoints
 curl http://localhost:3000/api/v1/websocket/health
 ```
+
+### 🔌 WebSocket Plugin Integration
+
+This project includes a **modular WebSocket plugin system** that allows you to easily add real-time features to any module.
+
+#### Quick Integration Guide
+
+**1. Create WebSocket Plugin**
+
+```typescript
+// src/modules/yourmodule/websocket/yourmodule-websocket.plugin.ts
+@Service('YourModuleWebSocketPlugin')
+export class YourModuleWebSocketPlugin implements WebSocketPlugin {
+  readonly name = 'YourModuleWebSocketPlugin';
+  readonly version = '1.0.0';
+
+  constructor(private readonly wsService: ICoreWebSocketService) {}
+
+  readonly serverToClientEvents = {
+    yourResourceCreated: () => {},
+    yourResourceUpdated: () => {},
+  };
+
+  readonly clientToServerEvents = {
+    subscribeToYourResource: () => {},
+  };
+
+  setupEventHandlers(socket: BaseCoreSocket, wsService: ICoreWebSocketService): void {
+    const pluginSocket = socket as any;
+    pluginSocket.on('subscribeToYourResource', (resourceId: number) => {
+      wsService.joinRoom(socket, `yourresource:${resourceId}`);
+    });
+  }
+
+  async onBusinessEvent(eventType: string, payload: WebSocketEventPayload): Promise<void> {
+    if (eventType === 'yourmodule.created') {
+      await this.wsService.broadcastToRoom('general', 'yourResourceCreated', payload);
+    }
+  }
+
+  // Public methods for service integration
+  async notifyResourceCreated(resource: any): Promise<void> {
+    await this.wsService.broadcastToRoom('general', 'yourResourceCreated', resource);
+  }
+
+  async cleanup(): Promise<void> {
+    // Cleanup logic
+  }
+}
+```
+
+**2. Register in Module Registry**
+
+```typescript
+// src/modules/yourmodule/yourmodule.registry.ts
+ModuleRegistry.registerModule({
+  name: 'YourModule',
+  register: async (container: Container) => {
+    // Register WebSocket plugin
+    const { YourModuleWebSocketPlugin } = await import('./websocket/yourmodule-websocket.plugin');
+    container.register('YourModuleWebSocketPlugin', YourModuleWebSocketPlugin, {
+      dependencies: ['WebSocketService'],
+    });
+
+    // Register service with plugin dependency
+    container.register('YourModuleService', YourModuleService, {
+      dependencies: ['YourModuleRepository', 'YourModuleWebSocketPlugin'],
+    });
+
+    // Register plugin with event registry
+    setTimeout(async () => {
+      const registry = container.get('WebSocketEventRegistry') as any;
+      const plugin = container.get('YourModuleWebSocketPlugin') as any;
+      registry.registerPlugin(plugin);
+    }, 0);
+  },
+});
+```
+
+**3. Use in Service**
+
+```typescript
+// src/modules/yourmodule/yourmodule.service.ts
+@Service('YourModuleService')
+export class YourModuleService {
+  constructor(
+    private readonly yourModuleRepository: YourModuleRepository,
+    private readonly yourModuleWebSocketPlugin: YourModuleWebSocketPlugin
+  ) {}
+
+  async create(data: CreateData): Promise<Response> {
+    // Business logic
+    const result = await this.yourModuleRepository.create(data);
+
+    // Real-time notification
+    await this.yourModuleWebSocketPlugin.notifyResourceCreated(result);
+
+    return result;
+  }
+}
+```
+
+#### Integration Benefits
+
+- ✅ **Modular**: Each module manages its own WebSocket events
+- ✅ **Type Safe**: Full TypeScript support with event type definitions
+- ✅ **Zero Conflicts**: Plugin system prevents merge conflicts
+- ✅ **Testable**: Easy to mock and test WebSocket functionality
+- ✅ **Real-time**: Instant notifications for CRUD operations
+
+#### Post Module Example
+
+See the **Post Module** (`src/modules/post/websocket/`) as a complete implementation example:
+
+- 📁 `post-websocket.plugin.ts` - Plugin implementation
+- 📁 `post-websocket.types.ts` - TypeScript event definitions
+- 📁 `post.service.ts` - Service integration
+- 📁 `post.registry.ts` - Module registry setup
+
+For detailed integration guide, see **[docs/ONBOARDING.md](docs/ONBOARDING.md#-websocket-plugin-integration-guide)**.
 
 ### API Documentation
 

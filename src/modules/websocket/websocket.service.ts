@@ -6,22 +6,27 @@ import { config } from '@/config/environment';
 import { Service } from '@/core/container';
 
 import {
-  AuthenticatedSocket,
-  ClientToServerEvents,
+  BaseCoreSocket,
+  CoreClientToServerEvents,
+  CoreServerToClientEvents,
+  ICoreWebSocketService,
   InterServerEvents,
-  IWebSocketService,
   RoomInfo,
-  ServerToClientEvents,
   SocketData,
   WebSocketConnectionInfo,
-} from '@/types/websocket';
+  WebSocketEventPayload,
+} from '@/modules/websocket/plugins/websocket-core';
+import { WebSocketEventRegistry } from '@/modules/websocket/plugins/websocket-event-registry';
 import { logger } from '@/utils/logger';
 
+// Type alias for backward compatibility
+type AuthenticatedSocket = BaseCoreSocket;
+
 @Service('WebSocketService')
-export class WebSocketService implements IWebSocketService {
+export class WebSocketService implements ICoreWebSocketService {
   private io!: SocketIOServer<
-    ClientToServerEvents,
-    ServerToClientEvents,
+    CoreClientToServerEvents,
+    CoreServerToClientEvents,
     InterServerEvents,
     SocketData
   >;
@@ -29,7 +34,7 @@ export class WebSocketService implements IWebSocketService {
   private rooms = new Map<string, RoomInfo>();
   private userSockets = new Map<number, Set<string>>(); // userId -> Set of socketIds
 
-  constructor() {
+  constructor(private readonly eventRegistry: WebSocketEventRegistry) {
     // Service will be initialized when server starts
   }
 
@@ -114,9 +119,9 @@ export class WebSocketService implements IWebSocketService {
   async handleConnection(socket: AuthenticatedSocket): Promise<void> {
     const connectionInfo: WebSocketConnectionInfo = {
       socketId: socket.id,
-      userId: socket.data.userId,
-      userName: socket.data.userName,
-      userRole: socket.data.userRole,
+      ...(socket.data.userId !== undefined && { userId: socket.data.userId }),
+      ...(socket.data.userName !== undefined && { userName: socket.data.userName }),
+      ...(socket.data.userRole !== undefined && { userRole: socket.data.userRole }),
       connectedAt: new Date(),
       lastActivity: new Date(),
       rooms: [],
@@ -138,8 +143,8 @@ export class WebSocketService implements IWebSocketService {
       totalConnections: this.connections.size,
     });
 
-    // Setup event handlers
-    this.setupEventHandlers(socket);
+    // Setup event handlers using injected registry
+    this.eventRegistry.setupSocketEventHandlers(socket, this);
 
     // Join general room
     await this.joinRoom(socket, 'general');
@@ -153,59 +158,10 @@ export class WebSocketService implements IWebSocketService {
     }
 
     // Send connection count to all clients
-    this.broadcastToAll('connectionCount', this.connections.size);
+    this.broadcastToAll('connectionCount', { count: this.connections.size });
 
     // Handle disconnection
     socket.on('disconnect', () => this.handleDisconnection(socket));
-  }
-
-  /**
-   * Setup event handlers for a socket
-   */
-  private setupEventHandlers(socket: AuthenticatedSocket): void {
-    // Room management
-    socket.on('joinRoom', (room: string) => {
-      this.joinRoom(socket, room);
-    });
-
-    socket.on('leaveRoom', (room: string) => {
-      this.leaveRoom(socket, room);
-    });
-
-    // Post subscription
-    socket.on('subscribeToPost', (postId: number) => {
-      this.joinRoom(socket, `post:${postId}`);
-    });
-
-    socket.on('unsubscribeFromPost', (postId: number) => {
-      this.leaveRoom(socket, `post:${postId}`);
-    });
-
-    // Typing indicators
-    socket.on('typing', (data: { postId: number; isTyping: boolean }) => {
-      if (socket.data.userId) {
-        socket.to(`post:${data.postId}`).emit('typing', {
-          ...data,
-          userId: socket.data.userId,
-          userName: socket.data.userName,
-        } as any);
-      }
-    });
-
-    // Ping/pong for connection monitoring
-    socket.on('ping', () => {
-      socket.emit('notification', {
-        message: 'pong',
-        type: 'info',
-      });
-      socket.data.lastActivity = new Date();
-    });
-
-    // Update activity timestamp on any event
-    socket.use((_event, next) => {
-      socket.data.lastActivity = new Date();
-      next();
-    });
   }
 
   /**
@@ -250,7 +206,7 @@ export class WebSocketService implements IWebSocketService {
     });
 
     // Send updated connection count
-    this.broadcastToAll('connectionCount', this.connections.size);
+    this.broadcastToAll('connectionCount', { count: this.connections.size });
   }
 
   /**
@@ -306,7 +262,7 @@ export class WebSocketService implements IWebSocketService {
   /**
    * Broadcast to a specific room
    */
-  async broadcastToRoom(room: string, event: string, data: any): Promise<void> {
+  async broadcastToRoom(room: string, event: string, data: WebSocketEventPayload): Promise<void> {
     this.io.to(room).emit(event as any, data);
 
     logger.debug('Broadcast to room', {
@@ -319,7 +275,7 @@ export class WebSocketService implements IWebSocketService {
   /**
    * Broadcast to a specific user (all their connections)
    */
-  async broadcastToUser(userId: number, event: string, data: any): Promise<void> {
+  async broadcastToUser(userId: number, event: string, data: WebSocketEventPayload): Promise<void> {
     const userSocketIds = this.userSockets.get(userId);
     if (userSocketIds) {
       for (const socketId of userSocketIds) {
@@ -338,7 +294,7 @@ export class WebSocketService implements IWebSocketService {
   /**
    * Broadcast to all connected clients
    */
-  async broadcastToAll(event: string, data: any): Promise<void> {
+  async broadcastToAll(event: string, data: WebSocketEventPayload): Promise<void> {
     this.io.emit(event as any, data);
 
     logger.debug('Broadcast to all', {
@@ -379,23 +335,6 @@ export class WebSocketService implements IWebSocketService {
    */
   getIOServer(): SocketIOServer {
     return this.io;
-  }
-
-  /**
-   * Notify about post events
-   */
-  async notifyPostCreated(post: any, authorName: string): Promise<void> {
-    await this.broadcastToRoom('general', 'postCreated', { post, author: authorName });
-  }
-
-  async notifyPostUpdated(post: any, authorName: string): Promise<void> {
-    await this.broadcastToRoom('general', 'postUpdated', { post, author: authorName });
-    await this.broadcastToRoom(`post:${post.id}`, 'postUpdated', { post, author: authorName });
-  }
-
-  async notifyPostDeleted(postId: number, authorName: string): Promise<void> {
-    await this.broadcastToRoom('general', 'postDeleted', { postId, author: authorName });
-    await this.broadcastToRoom(`post:${postId}`, 'postDeleted', { postId, author: authorName });
   }
 
   /**

@@ -65,12 +65,31 @@ src/
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
 │   │   └── auth.registry.ts
-│   └── user/           # User management module
-│       ├── user.controller.ts
-│       ├── user.service.ts
-│       ├── user.repository.ts
-│       ├── user.dto.ts
-│       └── user.registry.ts
+│   ├── user/           # User management module
+│   │   ├── user.controller.ts
+│   │   ├── user.service.ts
+│   │   ├── user.repository.ts
+│   │   ├── user.dto.ts
+│   │   └── user.registry.ts
+│   ├── post/           # Post management module
+│   │   ├── post.controller.ts
+│   │   ├── post.service.ts
+│   │   ├── post.repository.ts
+│   │   ├── post.dto.ts
+│   │   ├── post.registry.ts
+│   │   └── websocket/  # 🔌 Post WebSocket integration
+│   │       ├── post-websocket.plugin.ts
+│   │       └── post-websocket.types.ts
+│   └── websocket/      # 🔌 Real-time WebSocket module
+│       ├── websocket.controller.ts  # HTTP API endpoints
+│       ├── websocket.service.ts     # Core WebSocket service
+│       ├── websocket.dto.ts         # Data transfer objects
+│       ├── websocket.registry.ts    # Module registration
+│       └── plugins/                 # Plugin system
+│           ├── websocket-core.ts           # Core types & interfaces
+│           ├── websocket-plugin.interface.ts # Plugin interface
+│           ├── websocket-event-registry.ts  # Plugin registry
+│           └── core-websocket.plugin.ts     # Core events plugin
 └── models/             # Data models and interfaces
 
 reports/                # 🆕 Security and testing reports
@@ -753,6 +772,335 @@ npm run db:migrate:rollback
 
 See `docs/DATABASE_MIGRATION_GUIDE.md` for detailed database management.
 
+## 🔌 Real-Time WebSocket System
+
+This project includes a comprehensive **WebSocket system** built with Socket.io, featuring a modular plugin architecture for real-time functionality.
+
+### WebSocket Architecture
+
+```
+Client Browser ↔ Socket.io Server ↔ Plugin System ↔ Business Logic
+     ↓                   ↓                ↓               ↓
+WebSocket Client → WebSocketService → EventRegistry → Module Plugins
+```
+
+### Core Components
+
+#### 1. **WebSocket Service** (`src/modules/websocket/websocket.service.ts`)
+
+Central service managing all WebSocket connections and real-time features:
+
+```typescript
+@Service('WebSocketService')
+export class WebSocketService implements ICoreWebSocketService {
+  // Core features:
+  // ✅ Connection management with authentication
+  // ✅ Room-based broadcasting
+  // ✅ User presence tracking
+  // ✅ Plugin system integration
+  // ✅ JWT token authentication
+  // ✅ Anonymous connection support
+}
+```
+
+#### 2. **Plugin System** (`src/modules/websocket/plugins/`)
+
+Modular architecture allowing each feature module to register its own WebSocket events:
+
+```typescript
+// Plugin Interface
+export interface WebSocketPlugin {
+  readonly name: string;
+  readonly version: string;
+
+  // Define custom events
+  readonly serverToClientEvents: EventHandlerMap;
+  readonly clientToServerEvents: EventHandlerMap;
+
+  // Setup event handlers on connection
+  setupEventHandlers(socket: BaseCoreSocket, wsService: ICoreWebSocketService): void;
+
+  // Handle business events from services
+  onBusinessEvent?(eventType: string, payload: WebSocketEventPayload): Promise<void>;
+}
+```
+
+#### 3. **Event Registry** (`src/modules/websocket/plugins/websocket-event-registry.ts`)
+
+Manages plugin registration and event distribution:
+
+```typescript
+@Service('WebSocketEventRegistry')
+export class WebSocketEventRegistry {
+  // ✅ Plugin registration
+  // ✅ Event handler setup
+  // ✅ Business event distribution
+  // ✅ Type generation for TypeScript
+}
+```
+
+### WebSocket Features
+
+#### 🔐 **Authentication**
+
+- **JWT Token Support**: Authenticate using existing JWT tokens
+- **Anonymous Connections**: Allow unauthenticated users with limited access
+- **Role-Based Access**: Different features based on user roles
+
+```typescript
+// Client connection with authentication
+const socket = io('ws://localhost:3000', {
+  auth: {
+    token: 'your-jwt-token',
+  },
+});
+
+// Anonymous connection
+const socket = io('ws://localhost:3000');
+```
+
+#### 🏠 **Room Management**
+
+- **Automatic Room Joining**: Users automatically join 'general' room
+- **Feature-Specific Rooms**: Subscribe to specific posts, users, etc.
+- **Dynamic Room Creation**: Rooms created on-demand
+
+```typescript
+// Join specific rooms
+socket.emit('joinRoom', 'post:123');
+socket.emit('subscribeToPost', 123);
+
+// Leave rooms
+socket.emit('leaveRoom', 'post:123');
+socket.emit('unsubscribeFromPost', 123);
+```
+
+#### 📡 **Core Events**
+
+**Server-to-Client Events:**
+
+```typescript
+// System events
+'notification' - General notifications
+'connectionCount' - Live connection count
+'userJoined' - User presence tracking
+'userLeft' - User disconnection
+
+// Post events (via PostWebSocketPlugin)
+'postCreated' - New post published
+'postUpdated' - Post modified
+'postDeleted' - Post removed
+'typing' - Typing indicators
+```
+
+**Client-to-Server Events:**
+
+```typescript
+// Core events
+'joinRoom' - Join a room
+'leaveRoom' - Leave a room
+'ping' - Connection health check
+
+// Post events
+'subscribeToPost' - Subscribe to post updates
+'unsubscribeFromPost' - Unsubscribe from post
+'typing' - Send typing status
+```
+
+### WebSocket Plugins
+
+#### **Core Plugin** (`core-websocket.plugin.ts`)
+
+Handles basic WebSocket functionality:
+
+- Room management (join/leave)
+- Ping/pong health checks
+- Activity tracking
+- User presence notifications
+
+#### **Post Plugin** (`post/websocket/post-websocket.plugin.ts`)
+
+Integrates posts with real-time features:
+
+- Real-time post notifications (create/update/delete)
+- Post subscription system
+- Typing indicators for posts
+- Automatic integration with PostService
+
+### WebSocket HTTP API
+
+Administrative endpoints for WebSocket management:
+
+```bash
+# Health check (public)
+GET /api/v1/websocket/health
+
+# Admin endpoints (require ADMIN role)
+GET /api/v1/websocket/stats
+POST /api/v1/websocket/notify/broadcast
+POST /api/v1/websocket/notify/user
+POST /api/v1/websocket/notify/room
+GET /api/v1/websocket/users/:userId/connections
+```
+
+### Development Usage
+
+#### **Testing WebSocket Features**
+
+```bash
+# Interactive demo client available at:
+demo/websocket-client-demo.html
+
+# E2E tests for WebSocket functionality:
+npm run test:e2e -- --testPathPattern="websocket"
+```
+
+#### **Creating Custom WebSocket Plugins**
+
+1. **Create Plugin Class:**
+
+```typescript
+// src/modules/yourmodule/websocket/yourmodule-websocket.plugin.ts
+@Service('YourModuleWebSocketPlugin')
+export class YourModuleWebSocketPlugin implements WebSocketPlugin {
+  readonly name = 'YourModuleWebSocketPlugin';
+  readonly version = '1.0.0';
+
+  readonly serverToClientEvents = {
+    yourEvent: () => {},
+  };
+
+  readonly clientToServerEvents = {
+    yourClientEvent: () => {},
+  };
+
+  setupEventHandlers(socket: BaseCoreSocket, wsService: ICoreWebSocketService): void {
+    socket.on('yourClientEvent', data => {
+      // Handle client event
+    });
+  }
+
+  async onBusinessEvent(eventType: string, payload: WebSocketEventPayload): Promise<void> {
+    if (eventType === 'yourmodule.created') {
+      // Handle business event
+    }
+  }
+}
+```
+
+2. **Register Plugin in Module Registry:**
+
+```typescript
+// src/modules/yourmodule/yourmodule.registry.ts
+ModuleRegistry.registerModule({
+  name: 'YourModule',
+  register: async (container: Container) => {
+    const { YourModuleWebSocketPlugin } = await import('./websocket/yourmodule-websocket.plugin');
+
+    container.register('YourModuleWebSocketPlugin', YourModuleWebSocketPlugin, {
+      dependencies: ['WebSocketService'],
+    });
+
+    // Register plugin with EventRegistry
+    setTimeout(async () => {
+      const registry = container.get('WebSocketEventRegistry') as any;
+      const plugin = container.get('YourModuleWebSocketPlugin') as any;
+      registry.registerPlugin(plugin);
+    }, 0);
+  },
+});
+```
+
+3. **Integrate with Service:**
+
+```typescript
+// src/modules/yourmodule/yourmodule.service.ts
+@Service('YourModuleService')
+export class YourModuleService {
+  constructor(
+    private readonly yourModuleRepository: YourModuleRepository,
+    private readonly yourModuleWebSocketPlugin: YourModuleWebSocketPlugin
+  ) {}
+
+  async create(data: CreateData): Promise<YourModuleResponse> {
+    const result = await this.yourModuleRepository.create(data);
+
+    // Send real-time notification
+    await this.yourModuleWebSocketPlugin.notifyCreated(result);
+
+    return result;
+  }
+}
+```
+
+### Security Features
+
+#### **Authentication & Authorization**
+
+- JWT token validation for WebSocket connections
+- Role-based access to admin features
+- Anonymous connection support with limited access
+
+#### **Input Validation**
+
+- All WebSocket events validated for type safety
+- Admin endpoints require proper authentication
+- Rate limiting and connection monitoring
+
+#### **Error Handling**
+
+- Graceful error handling in plugins
+- Connection resilience and automatic reconnection
+- Detailed logging for monitoring and debugging
+
+### WebSocket Configuration
+
+```env
+# Environment variables for WebSocket
+NODE_ENV=development          # Affects CORS and logging
+PORT=3000                    # WebSocket server port
+ALLOWED_ORIGINS=http://localhost:3000  # CORS for WebSocket
+
+# JWT for WebSocket authentication
+JWT_SECRET=your-jwt-secret
+```
+
+### Client Integration Example
+
+```typescript
+// Frontend WebSocket client
+import { io } from 'socket.io-client';
+
+// Connect with authentication
+const socket = io('ws://localhost:3000', {
+  auth: {
+    token: localStorage.getItem('accessToken'),
+  },
+});
+
+// Listen for real-time events
+socket.on('postCreated', data => {
+  console.log('New post created:', data.post);
+  // Update UI with new post
+});
+
+socket.on('notification', data => {
+  showNotification(data.message, data.type);
+});
+
+// Subscribe to specific post updates
+socket.emit('subscribeToPost', postId);
+
+// Handle connection status
+socket.on('connect', () => {
+  console.log('Connected to WebSocket server');
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from WebSocket server');
+});
+```
+
 ## 🧪 Testing Strategy
 
 ### Security Testing
@@ -764,6 +1112,519 @@ Test security measures are in place:
 reports/security-testing/comprehensive-security-test-report.md
 reports/security-testing/security-fixes-verification-report.md
 ```
+
+### WebSocket Testing
+
+Comprehensive test coverage for WebSocket functionality:
+
+```bash
+# WebSocket unit tests (142 tests total)
+npm test -- --testPathPattern="websocket|plugins"
+
+# WebSocket e2e tests (16 tests)
+npm run test:e2e -- --testPathPattern="websocket"
+
+# Interactive testing
+open demo/websocket-client-demo.html
+```
+
+## 🔌 WebSocket Plugin Integration Guide
+
+This comprehensive guide shows how to integrate WebSocket functionality into any module using the **Post Module** as a concrete example.
+
+### Integration Architecture
+
+When integrating WebSocket plugins into modules, follow this architectural pattern:
+
+```
+Module Service → WebSocket Plugin → WebSocket Event Registry → WebSocket Service → Socket.io
+     ↓                    ↓                     ↓                     ↓
+Business Logic → Real-time Events → Event Routing → Client Broadcasting
+```
+
+### Step-by-Step Integration Process
+
+#### Step 1: Create WebSocket Types Definition
+
+Create type definitions for your module's WebSocket events:
+
+```typescript
+// src/modules/post/websocket/post-websocket.types.ts
+export interface PostServerToClientEvents {
+  postCreated: (data: { post: PostNotificationData; author: string }) => void;
+  postUpdated: (data: { post: PostNotificationData; author: string }) => void;
+  postDeleted: (data: { postId: number; author: string }) => void;
+  typing: (data: PostTypingData) => void;
+}
+
+export interface PostClientToServerEvents {
+  subscribeToPost: (postId: number) => void;
+  unsubscribeFromPost: (postId: number) => void;
+  typing: (data: { postId: number; isTyping: boolean }) => void;
+}
+
+export interface PostNotificationData {
+  type: 'created' | 'updated' | 'deleted';
+  postId: number;
+  authorId: number;
+  authorName: string;
+  title: string;
+  content: string;
+}
+
+export interface PostTypingData {
+  postId: number;
+  isTyping: boolean;
+  userId: number;
+  userName: string;
+}
+```
+
+#### Step 2: Create WebSocket Plugin Implementation
+
+Create the plugin class that implements the WebSocketPlugin interface:
+
+```typescript
+// src/modules/post/websocket/post-websocket.plugin.ts
+import { Service } from '@/core/container';
+import { PostResponse } from '@/models/post.model';
+import {
+  BaseCoreSocket,
+  ICoreWebSocketService,
+  WebSocketEventPayload,
+} from '@/modules/websocket/plugins/websocket-core';
+import { WebSocketPlugin } from '@/modules/websocket/plugins/websocket-plugin.interface';
+import { logger } from '@/utils/logger';
+import {
+  PostClientToServerEvents,
+  PostNotificationData,
+  PostServerToClientEvents,
+} from './post-websocket.types';
+
+@Service('PostWebSocketPlugin')
+export class PostWebSocketPlugin implements WebSocketPlugin {
+  readonly name = 'PostWebSocketPlugin';
+  readonly version = '1.0.0';
+
+  constructor(private readonly wsService: ICoreWebSocketService) {}
+
+  // 1. Define event types (for type safety)
+  readonly serverToClientEvents: PostServerToClientEvents = {
+    postCreated: () => {},
+    postUpdated: () => {},
+    postDeleted: () => {},
+    typing: () => {},
+  };
+
+  readonly clientToServerEvents: PostClientToServerEvents = {
+    subscribeToPost: () => {},
+    unsubscribeFromPost: () => {},
+    typing: () => {},
+  };
+
+  // 2. Setup WebSocket event handlers (client-initiated events)
+  setupEventHandlers(socket: BaseCoreSocket, wsService: ICoreWebSocketService): void {
+    const pluginSocket = socket as any;
+
+    // Handle post subscription
+    pluginSocket.on('subscribeToPost', (postId: number) => {
+      const room = `post:${postId}`;
+      wsService.joinRoom(socket, room);
+      logger.debug('Socket subscribed to post', { socketId: socket.id, postId });
+    });
+
+    // Handle post unsubscription
+    pluginSocket.on('unsubscribeFromPost', (postId: number) => {
+      const room = `post:${postId}`;
+      wsService.leaveRoom(socket, room);
+      logger.debug('Socket unsubscribed from post', { socketId: socket.id, postId });
+    });
+
+    // Handle typing indicators
+    pluginSocket.on('typing', (data: { postId: number; isTyping: boolean }) => {
+      if (socket.data.userId && socket.data.userName) {
+        const typingData = {
+          ...data,
+          userId: socket.data.userId,
+          userName: socket.data.userName,
+        };
+        pluginSocket.to(`post:${data.postId}`).emit('typing', typingData);
+      }
+    });
+  }
+
+  // 3. Handle business events (server-initiated events)
+  async onBusinessEvent(eventType: string, payload: WebSocketEventPayload): Promise<void> {
+    const postPayload = payload as unknown as PostNotificationData;
+
+    switch (eventType) {
+      case 'post.created':
+        await this.handlePostCreated(postPayload);
+        break;
+      case 'post.updated':
+        await this.handlePostUpdated(postPayload);
+        break;
+      case 'post.deleted':
+        await this.handlePostDeleted(postPayload);
+        break;
+    }
+  }
+
+  // 4. Private event handlers
+  private async handlePostCreated(payload: PostNotificationData): Promise<void> {
+    await this.wsService.broadcastToRoom('general', 'postCreated', {
+      post: payload,
+      author: payload.authorName,
+    });
+    logger.debug('Post created notification sent', { postId: payload.postId });
+  }
+
+  private async handlePostUpdated(payload: PostNotificationData): Promise<void> {
+    await this.wsService.broadcastToRoom('general', 'postUpdated', {
+      post: payload,
+      author: payload.authorName,
+    });
+    await this.wsService.broadcastToRoom(`post:${payload.postId}`, 'postUpdated', {
+      post: payload,
+      author: payload.authorName,
+    });
+    logger.debug('Post updated notification sent', { postId: payload.postId });
+  }
+
+  private async handlePostDeleted(payload: PostNotificationData): Promise<void> {
+    await this.wsService.broadcastToRoom('general', 'postDeleted', {
+      postId: payload.postId,
+      author: payload.authorName,
+    });
+    await this.wsService.broadcastToRoom(`post:${payload.postId}`, 'postDeleted', {
+      postId: payload.postId,
+      author: payload.authorName,
+    });
+    logger.debug('Post deleted notification sent', { postId: payload.postId });
+  }
+
+  // 5. Public methods for service integration
+  async notifyPostCreated(post: PostResponse, authorName: string): Promise<void> {
+    await this.handlePostCreated({
+      type: 'created',
+      postId: post.id,
+      authorId: post.authorId,
+      authorName,
+      title: post.title,
+      content: post.content,
+    });
+  }
+
+  async notifyPostUpdated(post: PostResponse, authorName: string): Promise<void> {
+    await this.handlePostUpdated({
+      type: 'updated',
+      postId: post.id,
+      authorId: post.authorId,
+      authorName,
+      title: post.title,
+      content: post.content,
+    });
+  }
+
+  async notifyPostDeleted(post: PostResponse, authorName: string): Promise<void> {
+    await this.handlePostDeleted({
+      type: 'deleted',
+      postId: post.id,
+      authorId: post.authorId,
+      authorName,
+      title: post.title,
+      content: post.content,
+    });
+  }
+
+  async cleanup(): Promise<void> {
+    logger.info('Post WebSocket plugin cleaned up');
+  }
+}
+```
+
+#### Step 3: Register Plugin in Module Registry
+
+Update your module's registry to include the WebSocket plugin:
+
+```typescript
+// src/modules/post/post.registry.ts
+import { Container } from '@/core/container';
+import { ModuleRegistry } from '@/core/module-registry';
+import { logger } from '@/utils/logger';
+
+ModuleRegistry.registerModule({
+  name: 'PostModule',
+  register: async (container: Container) => {
+    // Import all module services
+    const { PostRepository } = await import('@/modules/post/post.repository');
+    const { PostService } = await import('@/modules/post/post.service');
+    const { PostController } = await import('@/modules/post/post.controller');
+    const { PostWebSocketPlugin } = await import('@/modules/post/websocket/post-websocket.plugin');
+
+    // Register services
+    container.register('PostRepository', PostRepository);
+
+    // ⚠️ Important: Register WebSocket plugin with WebSocketService dependency
+    container.register('PostWebSocketPlugin', PostWebSocketPlugin, {
+      dependencies: ['WebSocketService'],
+    });
+
+    // Register service with WebSocket plugin dependency
+    container.register('PostService', PostService, {
+      dependencies: ['PostRepository', 'PostWebSocketPlugin'],
+    });
+
+    container.register('PostController', PostController, {
+      dependencies: ['PostService'],
+    });
+
+    // ⚠️ Critical: Register plugin with WebSocketEventRegistry
+    // Use setTimeout to ensure all services are registered first
+    setTimeout(async () => {
+      try {
+        const registry = container.get('WebSocketEventRegistry') as any;
+        const plugin = container.get('PostWebSocketPlugin') as any;
+        registry.registerPlugin(plugin);
+        logger.info('PostWebSocketPlugin registered successfully');
+      } catch (error) {
+        logger.error('Failed to register PostWebSocketPlugin:', error);
+      }
+    }, 0);
+  },
+});
+```
+
+#### Step 4: Integrate Plugin in Service Layer
+
+Update your service to use the WebSocket plugin:
+
+```typescript
+// src/modules/post/post.service.ts
+import { Service } from '@/core/container';
+import { PostRepository } from './post.repository';
+import { PostWebSocketPlugin } from './websocket/post-websocket.plugin';
+
+@Service('PostService')
+export class PostService {
+  constructor(
+    private readonly postRepository: PostRepository,
+    private readonly postWebSocketPlugin: PostWebSocketPlugin // ⚠️ Inject WebSocket plugin
+  ) {}
+
+  async create(postData: CreatePostRequest): Promise<PostResponse> {
+    // 1. Perform business logic
+    const post = await this.postRepository.create(postData);
+    const response = this.toPostResponse(post);
+
+    // 2. Get additional data needed for WebSocket notification
+    const authorName = await this.getAuthorName(post.authorId);
+
+    // 3. Send WebSocket notification
+    await this.postWebSocketPlugin.notifyPostCreated(response, authorName);
+
+    return response;
+  }
+
+  async update(id: number, updateData: UpdatePostRequest): Promise<PostResponse> {
+    // 1. Perform business logic
+    const post = await this.postRepository.update(id, updateData);
+    const response = this.toPostResponse(post);
+
+    // 2. Get additional data needed for WebSocket notification
+    const authorName = await this.getAuthorName(post.authorId);
+
+    // 3. Send WebSocket notification
+    await this.postWebSocketPlugin.notifyPostUpdated(response, authorName);
+
+    return response;
+  }
+
+  async delete(id: number): Promise<PostResponse> {
+    // 1. Get data before deletion
+    const existingPost = await this.postRepository.findById(id);
+    if (!existingPost) {
+      throw new NotFoundError('Post not found');
+    }
+
+    // 2. Perform business logic
+    const success = await this.postRepository.delete(id);
+    if (!success) {
+      throw new InternalServerError('Cannot delete Post');
+    }
+
+    // 3. Send WebSocket notification
+    const authorName = await this.getAuthorName(existingPost.authorId);
+    await this.postWebSocketPlugin.notifyPostDeleted(existingPost, authorName);
+
+    return this.toPostResponse(existingPost);
+  }
+
+  // Helper methods...
+  private async getAuthorName(authorId: number): Promise<string> {
+    // Implementation to get author name
+    return `User ${authorId}`;
+  }
+}
+```
+
+### Integration Best Practices
+
+#### 1. **Plugin Organization**
+
+```
+src/modules/yourmodule/
+├── yourmodule.controller.ts
+├── yourmodule.service.ts
+├── yourmodule.repository.ts
+├── yourmodule.registry.ts
+└── websocket/                    # 📦 WebSocket integration
+    ├── yourmodule-websocket.plugin.ts
+    └── yourmodule-websocket.types.ts
+```
+
+#### 2. **Event Naming Conventions**
+
+- **Client Events**: `subscribeToPost`, `unsubscribeFromPost`, `typing`
+- **Server Events**: `postCreated`, `postUpdated`, `postDeleted`
+- **Business Events**: `post.created`, `post.updated`, `post.deleted`
+
+#### 3. **Room Management**
+
+```typescript
+// Subscribe to specific resources
+socket.emit('subscribeToPost', postId);
+
+// Server creates room based on resource
+const room = `post:${postId}`;
+wsService.joinRoom(socket, room);
+
+// Broadcast to specific rooms
+await wsService.broadcastToRoom(`post:${postId}`, 'postUpdated', data);
+```
+
+#### 4. **Error Handling**
+
+```typescript
+// Always wrap WebSocket calls in try-catch
+try {
+  await this.postWebSocketPlugin.notifyPostCreated(response, authorName);
+} catch (error) {
+  logger.error('WebSocket notification failed:', error);
+  // Don't throw - WebSocket failures shouldn't break business logic
+}
+```
+
+#### 5. **Testing Integration**
+
+```typescript
+// Unit test with mocked WebSocket plugin
+const mockWebSocketPlugin = {
+  notifyPostCreated: jest.fn(),
+  notifyPostUpdated: jest.fn(),
+  notifyPostDeleted: jest.fn(),
+};
+
+// Test service with mocked plugin
+const postService = new PostService(mockRepository, mockWebSocketPlugin);
+await postService.create(createData);
+
+// Verify WebSocket notification was called
+expect(mockWebSocketPlugin.notifyPostCreated).toHaveBeenCalledWith(
+  expect.objectContaining({ id: expect.any(Number) }),
+  'User 1'
+);
+```
+
+### Creating Your Own WebSocket Plugin
+
+To create a WebSocket plugin for your module, follow this template:
+
+```typescript
+// src/modules/yourmodule/websocket/yourmodule-websocket.plugin.ts
+@Service('YourModuleWebSocketPlugin')
+export class YourModuleWebSocketPlugin implements WebSocketPlugin {
+  readonly name = 'YourModuleWebSocketPlugin';
+  readonly version = '1.0.0';
+
+  constructor(private readonly wsService: ICoreWebSocketService) {}
+
+  readonly serverToClientEvents = {
+    yourResourceCreated: () => {},
+    yourResourceUpdated: () => {},
+    yourResourceDeleted: () => {},
+  };
+
+  readonly clientToServerEvents = {
+    subscribeToYourResource: () => {},
+    unsubscribeFromYourResource: () => {},
+  };
+
+  setupEventHandlers(socket: BaseCoreSocket, wsService: ICoreWebSocketService): void {
+    const pluginSocket = socket as any;
+
+    pluginSocket.on('subscribeToYourResource', (resourceId: number) => {
+      const room = `yourresource:${resourceId}`;
+      wsService.joinRoom(socket, room);
+    });
+
+    pluginSocket.on('unsubscribeFromYourResource', (resourceId: number) => {
+      const room = `yourresource:${resourceId}`;
+      wsService.leaveRoom(socket, room);
+    });
+  }
+
+  async onBusinessEvent(eventType: string, payload: WebSocketEventPayload): Promise<void> {
+    switch (eventType) {
+      case 'yourmodule.created':
+        await this.handleResourceCreated(payload);
+        break;
+      case 'yourmodule.updated':
+        await this.handleResourceUpdated(payload);
+        break;
+      case 'yourmodule.deleted':
+        await this.handleResourceDeleted(payload);
+        break;
+    }
+  }
+
+  // Public methods for service integration
+  async notifyResourceCreated(resource: YourResourceResponse): Promise<void> {
+    await this.handleResourceCreated({
+      type: 'created',
+      resourceId: resource.id,
+      // ... other properties
+    });
+  }
+
+  private async handleResourceCreated(payload: any): Promise<void> {
+    await this.wsService.broadcastToRoom('general', 'yourResourceCreated', {
+      resource: payload,
+    });
+  }
+
+  async cleanup(): Promise<void> {
+    // Cleanup logic
+  }
+}
+```
+
+### WebSocket Plugin Integration Checklist
+
+When integrating WebSocket plugins, ensure you complete these steps:
+
+- [ ] **Step 1**: Create WebSocket types definition (`*-websocket.types.ts`)
+- [ ] **Step 2**: Implement WebSocket plugin class (`*-websocket.plugin.ts`)
+- [ ] **Step 3**: Register plugin in module registry with proper dependencies
+- [ ] **Step 4**: Inject plugin into service layer
+- [ ] **Step 5**: Call plugin methods from service operations
+- [ ] **Step 6**: Add error handling for WebSocket failures
+- [ ] **Step 7**: Create unit tests with mocked plugin
+- [ ] **Step 8**: Test integration with WebSocket demo client
+- [ ] **Step 9**: Document custom events and room management
+- [ ] **Step 10**: Add plugin to WebSocket event registry
+
+This integration pattern ensures that WebSocket functionality is properly modularized, testable, and follows the established architectural patterns of the project.
 
 ### Unit Tests
 
