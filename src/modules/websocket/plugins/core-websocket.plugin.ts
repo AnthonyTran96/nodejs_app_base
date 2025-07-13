@@ -1,5 +1,9 @@
 import { Service } from '@/core/container';
-import { BaseCoreSocket, ICoreWebSocketService } from '@/modules/websocket/plugins/websocket-core';
+import {
+  BaseCoreSocket,
+  ICoreWebSocketService,
+  WebSocketEventPayload,
+} from '@/modules/websocket/plugins/websocket-core';
 import { logger } from '@/utils/logger';
 import { EventHandlerMap, WebSocketPlugin } from './websocket-plugin.interface';
 
@@ -54,9 +58,8 @@ export class CoreWebSocketPlugin implements WebSocketPlugin {
   /**
    * Core plugin doesn't handle business events
    */
-  async onBusinessEvent?() // eventType: string,
-  // payload: WebSocketEventPayload
-  : Promise<void> {
+  // eslint-disable-next-line no-unused-vars
+  async onBusinessEvent?(_eventType: string, _payload: WebSocketEventPayload): Promise<void> {
     // Core plugin typically doesn't handle business events
     // This is for module-specific business logic
   }
