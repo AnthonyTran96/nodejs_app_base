@@ -1,10 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '@/auth/auth.service';
-import { UserService } from '@/user/user.service';
-import { ResponseUtil } from '@/utils/response';
-import { AuthenticatedRequest } from '@/types/common';
 import { Service } from '@/core/container';
 import { UnauthorizedError } from '@/middleware/error-handler';
+import { AuthenticatedRequest } from '@/types/common';
+import { UserService } from '@/user/user.service';
+import { ResponseUtil } from '@/utils/response';
+import { NextFunction, Request, Response } from 'express';
 
 @Service('AuthController')
 export class AuthController {
@@ -84,7 +84,7 @@ export class AuthController {
       }
 
       // Fetch full user object from database
-      const user = await this.userService.findById(req.user.userId);
+      const user = await this.userService.findById(req.user.id);
       if (!user) {
         throw new UnauthorizedError('User not found');
       }

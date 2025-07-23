@@ -10,9 +10,9 @@ export class QueryBuilder {
     }
   }
 
-  static createPlaceholders(count: number): string {
+  static createPlaceholders(count: number, start = 0): string {
     const placeholders = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = start; i < count + start; i++) {
       placeholders.push(this.createPlaceholder(i));
     }
     return placeholders.join(', ');

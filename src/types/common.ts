@@ -1,3 +1,7 @@
+import { User } from '@/models/user.model';
+import { Role } from '@/types/role.enum';
+import { Request } from 'express';
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -28,8 +32,6 @@ export interface PaginatedResult<T> {
   };
 }
 
-import { Role } from '@/types/role.enum';
-
 export interface JwtPayload {
   userId: number;
   email: string;
@@ -38,10 +40,8 @@ export interface JwtPayload {
   exp?: number;
 }
 
-import { Request } from 'express';
-
 export interface AuthenticatedRequest extends Request {
-  user?: JwtPayload;
+  user?: User;
 }
 
 export type Constructor<T = {}> = new (...args: unknown[]) => T;

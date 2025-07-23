@@ -1,12 +1,18 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { config } from '@/config/environment';
-import { JwtPayload, AuthenticatedRequest } from '@/types/common';
-import { UnauthorizedError, ForbiddenError } from '@/middleware/error-handler';
+import { Container } from '@/core/container';
+import { ForbiddenError, UnauthorizedError } from '@/middleware/error-handler';
+import { UserService } from '@/modules/user/user.service';
+import { AuthenticatedRequest, JwtPayload } from '@/types/common';
 import { Role } from '@/types/role.enum';
+import { NextFunction, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 
 export class AuthMiddleware {
-  static authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
+  static async authenticate(
+    req: AuthenticatedRequest,
+    _res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const token = AuthMiddleware.extractToken(req);
 
@@ -17,7 +23,11 @@ export class AuthMiddleware {
       }
 
       const payload = jwt.verify(token, config.jwt.secret) as JwtPayload;
-      req.user = payload;
+
+      const container = Container.getInstance();
+      const userService = container.get<UserService>('UserService');
+      const user = await userService.getUserByAuth(payload);
+      req.user = user;
 
       next();
     } catch (error) {
@@ -45,13 +55,21 @@ export class AuthMiddleware {
     };
   }
 
-  static optional(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
+  static async optional(
+    req: AuthenticatedRequest,
+    _res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const token = AuthMiddleware.extractToken(req);
 
       if (token) {
         const payload = jwt.verify(token, config.jwt.secret) as JwtPayload;
-        req.user = payload;
+
+        const container = Container.getInstance();
+        const userService = container.get<UserService>('UserService');
+        const user = await userService.getUserByAuth(payload);
+        req.user = user;
       }
 
       next();
