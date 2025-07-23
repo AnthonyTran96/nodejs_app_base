@@ -88,7 +88,7 @@ export class UserController {
 
       const { currentPassword, newPassword } = req.body;
 
-      await this.userService.changePassword(req.user.userId, currentPassword, newPassword);
+      await this.userService.changePassword(req.user.id, currentPassword, newPassword);
 
       ResponseUtil.success(res, null, 'Password changed successfully');
     } catch (error) {

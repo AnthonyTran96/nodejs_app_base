@@ -2,7 +2,7 @@ import { Service } from '@/core/container';
 import { UnitOfWork } from '@/core/unit-of-work';
 import { NotFoundError, ValidationError } from '@/middleware/error-handler';
 import { CreateUserRequest, UpdateUserRequest, User, UserResponse } from '@/models/user.model';
-import { PaginatedResult, PaginationOptions } from '@/types/common';
+import { JwtPayload, PaginatedResult, PaginationOptions } from '@/types/common';
 import { Role } from '@/types/role.enum';
 import { HashUtil } from '@/utils/hash';
 import { UserRepository } from './user.repository';
@@ -120,6 +120,18 @@ export class UserService {
       adminCount,
       userCount,
     };
+  }
+
+  async getUserByAuth(jwt: JwtPayload): Promise<User> {
+    const userId = jwt.userId;
+    if (!userId) {
+      throw new NotFoundError('User not found');
+    }
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+    return { ...user, password: '' };
   }
 
   private toUserResponse(user: User): UserResponse {
