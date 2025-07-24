@@ -36,7 +36,7 @@ export abstract class BaseRepository<T> {
     let sql = `SELECT * FROM ${this.tableName}`;
 
     // Use QueryBuilder for filter processing, after transforming filter keys to snake_case
-    const snakeCaseFilters = this.transformInputData(filters);
+    const snakeCaseFilters = DataTransformer.transformInputData(filters, {});
     const { where, params } = QueryBuilder.buildFilterWhereClause(snakeCaseFilters);
 
     if (where) {
