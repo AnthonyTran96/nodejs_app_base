@@ -17,7 +17,7 @@ export function ValidationMiddleware<T>(
 
       // Validate the DTO
       const errors = await validate(dto as object, {
-        whitelist: true,
+        // whitelist: true,
         // forbidNonWhitelisted: true,
       });
 

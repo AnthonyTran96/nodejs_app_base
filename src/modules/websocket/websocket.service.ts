@@ -18,6 +18,9 @@ import {
 } from '@/modules/websocket/plugins/websocket-core';
 import { WebSocketEventRegistry } from '@/modules/websocket/plugins/websocket-event-registry';
 import { logger } from '@/utils/logger';
+import { Handshake } from 'socket.io/dist/socket-types';
+
+const cookie = require('cookie');
 
 // Type alias for backward compatibility
 type AuthenticatedSocket = BaseCoreSocket;
@@ -70,9 +73,7 @@ export class WebSocketService implements ICoreWebSocketService {
     next: (err?: Error) => void
   ): Promise<void> {
     try {
-      const token =
-        socket.handshake.auth.token ||
-        socket.handshake.headers.authorization?.replace('Bearer ', '');
+      const token = socket.handshake.auth.token || this.extractToken(socket.handshake);
 
       if (!token) {
         // Allow anonymous connections but mark them as such
@@ -111,6 +112,24 @@ export class WebSocketService implements ICoreWebSocketService {
       socket.data.lastActivity = new Date();
       next();
     }
+  }
+
+  private extractToken(handshake: Handshake): string | null {
+    // Try Authorization header first
+    const authHeader = handshake.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      return authHeader.substring(7);
+    }
+
+    // Try cookie as fallback
+    const cookieRaw = handshake.headers.cookie;
+    const cookieStr = Array.isArray(cookieRaw) ? cookieRaw[0] : cookieRaw;
+    if (cookieStr) {
+      const parsed = cookie.parse(cookieStr);
+      if (parsed.accessToken) return parsed.accessToken;
+    }
+
+    return null;
   }
 
   /**

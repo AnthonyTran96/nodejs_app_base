@@ -18,6 +18,24 @@ export class QueryBuilder {
     return placeholders.join(', ');
   }
 
+  static buildSortClause(
+    sortBy: string,
+    sortOrder: string,
+    options: FilterOptions = {}
+  ): { order: string } {
+    const key = sortBy;
+    let columnName = key;
+    if (options.filterMapping && options.filterMapping[key]) {
+      const mapping = options.filterMapping[key];
+      columnName = `${mapping.tableAlias}.${mapping.column}`;
+    } else if (options.tableAlias) {
+      columnName = `${options.tableAlias}.${key}`;
+    }
+    return {
+      order: `${columnName} ${sortOrder}`,
+    };
+  }
+
   static buildFilterWhereClause<T>(
     filters: AdvancedFilter<T>,
     options: FilterOptions = {}
