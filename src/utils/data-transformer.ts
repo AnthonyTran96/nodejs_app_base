@@ -226,13 +226,15 @@ export class DataTransformer {
           return originalValue;
         }
 
-      case 'bigint':
-        try {
-          return BigInt(originalValue);
-        } catch (e) {
-          logger.error(`Failed to convert to BigInt for field '${fieldKey}':`, originalValue);
-          return BigInt(0);
+      case 'bigint': {
+        if (typeof originalValue === 'bigint') {
+          const safeValue = Number(originalValue);
+          return Number.isNaN(safeValue) ? 0 : safeValue;
         }
+
+        const intValue = parseInt(originalValue, 10);
+        return isNaN(intValue) ? 0 : intValue;
+      }
 
       case 'buffer':
         try {
